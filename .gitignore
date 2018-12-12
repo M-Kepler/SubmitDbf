@@ -1,0 +1,6 @@
+file/*
+doc/*
+common/*
+*.o
+*.out
+*.sqx
