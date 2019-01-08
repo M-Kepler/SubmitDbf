@@ -104,10 +104,10 @@ int CDbfRead::Read(pCallback pfn, int nPageNum)
                                     // 虽然多出来的空间会清零,32位机器上1页是4k大小
     size_t totalSize;               // 保存一次映射中未处理的数据记录的大小
     size_t remainFileSize;          // dbf文件的未映射到内存区域的大小
-    int remainLen = 0;              // 一条记录被分在A,B页; (其实是分隔在1、2两次映射的文件,但每次映射都是页的整数倍, 所以说分隔在两页也对)保存被截断的记录在A页页尾的长度
-    int tailLen = 0;                // 一条记录被分在A,B页; 保存被截断的记录在B页页头的长度
-    char remainBuf[2048] = {0};     // 一条记录被分在A,B页; 保存被截断的那条记录在A页中的数据
-    char firstRecord[1024] = {0};   // 一条记录被分在A,B页; 保存被截断的那条记录
+    int remainLen = 0;              // 一条记录被分在A,B页, 保存被截断的记录在A页页尾的长度
+    int tailLen = 0;                // 一条记录被分在A,B页, 保存被截断的记录在B页页头的长度
+    char remainBuf[2048] = {0};     // 一条记录被分在A,B页, 保存被截断的那条记录在A页中的数据
+    char firstRecord[1024] = {0};   // 一条记录被分在A,B页, 保存被截断的那条记录
 
     fd = open(m_strFile.c_str(), O_RDONLY, 0);
     if (fd < 0)
@@ -132,7 +132,6 @@ int CDbfRead::Read(pCallback pfn, int nPageNum)
     }
 
     remainFileSize = stat.st_size;
-
 
     for (int i = 0; i < mmapCount; i++)
     {
@@ -229,60 +228,3 @@ int CDbfRead::Read(pCallback pfn, int nPageNum)
     return 0;
 }
 
-
-int CDbfRead::ReadMmapOnce(pCallback pfn, int nPageNum)
-{
-    int fd;
-    struct stat stat;
-    char *pPos = NULL;            // 读取位置记录
-    size_t mmapSize;              // 一次映射的长度大小, 必须是页的整数倍;不满一页也要分配一页空间
-                                  // 虽然多出来的空间会清零,32位机器上1页是4k大小
-    size_t totalSize;             // 保存一次映射中未处理的数据记录的大小
-    size_t remainFileSize;        // dbf文件的未映射到内存区域的大小
-    int remainLen = 0;            // 一条记录被分在A,B页, 保存被截断的记录在A页页尾的长度
-    int tailLen = 0;              // 一条记录被分在A,B页, 保存被截断的记录在B页页头的长度
-    char remainBuf[2048] = {0};   // 一条记录被分在A,B页, 保存被截断的那条记录在A页中的数据
-    char firstRecord[1024] = {0}; // 一条记录被分在A,B页, 保存被截断的那条记录
-
-    fd = open(m_strFile.c_str(), O_RDONLY, 0);
-    if (fd < 0)
-    {
-        return -1;
-    }
-
-    fstat(fd, &stat); // 文件fd结构到stat结构体
-
-    size_t pagesize = getpagesize();
-    size_t size;
-
-    if (0 != stat.st_size % pagesize)
-    {
-        size = ((stat.st_size / pagesize) + 1) * pagesize;
-    }
-
-    void *pMmapBuf = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
-    if (pMmapBuf == (void *)-1)
-    {
-        return -1;
-    }
-
-    totalSize = stat.st_size;
-    pPos = (char *)pMmapBuf + m_sFileHeadBytesNum + 1;
-    totalSize = totalSize - m_sFileHeadBytesNum;        // 总大小减去文件头后就是数据记录的大小
-
-    int j = 0;
-    while (totalSize >= m_sRecordSize)
-    {
-        char szBuf[2048] = {0};
-        memcpy(szBuf, pPos + j * m_sRecordSize, m_sRecordSize);
-        pfn(m_vecFieldHead, szBuf);
-        j++;
-        totalSize = totalSize - m_sRecordSize;
-    }
-
-    munmap(pMmapBuf, mmapSize);
-
-    close(fd);
-
-    return 0;
-}

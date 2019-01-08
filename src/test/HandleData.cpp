@@ -11,8 +11,8 @@
 #include <stdio.h>
 #include "DbfRead.h"
 #include "inifile.h"
-#include "dao_base.h"
-#include "dao_dynamicsql.h"
+// #include "dao_base.h"
+// #include "dao_dynamicsql.h"
 using namespace inifile;
 
 int g_count = 0;
@@ -25,8 +25,8 @@ string g_strFile;
 
 typedef void (*pLineCallback)(int iCnt, const char *pcszContent);
 
-CDAOBase g_oDaoBaseHandler;
-CDAODynamicSql g_oDaoDynamicSqlHandler;
+// CDAOBase g_oDaoBaseHandler;
+// CDAODynamicSql g_oDaoDynamicSqlHandler;
 
 
 void trim(std::string &s)
@@ -172,10 +172,12 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
     strncat(szSql, szTempBuff, sizeof(szSql) - strlen(szSql) - 1);
 
     fprintf(pf, "%s\n", szSql);
+    fflush(pf);
 }
 
 
 // 连接数据库
+/*
 // TODO 加密 肯定不能明文放在配置文件啊
 int ConnectOracle(void)
 {
@@ -241,6 +243,7 @@ void ReadFile(const std::string &strFile, int iCommitCnt, pLineCallback pf)
         free(line);
     }
 }
+*/
 
 // 删除文件夹下所有文件
 void DeleteAllFile(const char* dirPath, const char *extenStr="sql")
@@ -313,6 +316,7 @@ int GeneraCommand(string strFilePath)
 
 
 // main函数命令
+/*
 int RunSqlCommand()
 {
     int iRetCode;
@@ -372,7 +376,7 @@ int RunSqlCommand()
         }
         g_nCommitCount = 0;
     }
-    */
+    *
     // end
 
     // TODO 多进程, 每个进程分别调用ReadFile处理一个文件
@@ -426,7 +430,7 @@ int RunSqlCommand()
     // fflush(fpInsert);
     return 0;
 }
-
+*/
 
 int main(int argc, char *argv[])
 {
@@ -451,6 +455,7 @@ int main(int argc, char *argv[])
             printf("Error while generate sql file");
         }
     }
+    /*
     if (strcmp(argv[1], "run") == 0 || strcmp(argv[1], "batch") == 0)
     {
         iRetCode = RunSqlCommand();
@@ -459,6 +464,7 @@ int main(int argc, char *argv[])
             printf("\nError while run sql, errorcode:%d", iRetCode);
         }
     }
+    */
     
     lEndStampTimes = time(NULL);
 

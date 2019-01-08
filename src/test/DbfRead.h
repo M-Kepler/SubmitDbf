@@ -55,13 +55,6 @@ class CDbfRead
      */
     int Read(pCallback pfn, int nPageNum = 128000);
 
-    /*
-     * @brief	: 上面的接口以每次500m来映射, 该接口一次全部映射完
-     * @param	: 
-     * @return	: 
-     */
-    int ReadMmapOnce(pCallback pfn, int nPageNum = 128000);
-
     int GetRecordNum()
     {
         return m_nRecordNum;

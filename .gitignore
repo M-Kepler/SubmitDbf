@@ -1,6 +1,7 @@
-file/*
-doc/*
-common/*
+/file/
+/doc/
+/common/
+/dbf/qtzhzl100077.dbf
 *.o
 *.out
 *.sqx
