@@ -1,3 +1,5 @@
+.PHONY: gensql
+
 PLATFORM = OS_IS_LINUX
 DATABASE = DATABASE_IS_ORACLE
 COMPAT_STRING= "DATABASE_IS_ORACLE"
@@ -28,6 +30,17 @@ BITSFLAGS = -m64
 CFLAGS = $(BITSFLAGS) -w -O2 -fPIC -D$(PLATFORM) -D$(DATABASE) -D$(DEBUG_FLAG) $(I_INCLUDE) $(DEBUG_OPS)
 
 TARGET = ./main.out
+
+
+
+# ==============================================================================================================================
+
+gensql: $^
+	@echo "===---===--===\nto general sql\n===---===---===\n"
+	g++ --std=c++11 -g -c  inifile.cpp -o inifile.o
+	g++ --std=c++11 -g -c DbfRead.cpp -o DbfRead.o
+	g++ --std=c++11 -g  inifile.o DbfRead.o GeneSql.cpp -o gene_sql.out
+
 
 # ==============================================================================================================================
 

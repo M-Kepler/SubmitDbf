@@ -1,7 +1,7 @@
 /file/
 /doc/
 /common/
-/dbf/qtzhzl100077.dbf
+/dbf/qtzhzl*
 *.o
 *.out
 *.sqx

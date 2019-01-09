@@ -3,11 +3,9 @@
 ## 说明
 
 * makefile
-```
-makefile_genq 是单纯为编译生成sql的代码而写的, 不涉及数据库, 可直接make
-makefile_all  包括生成 sql 文件和插入数据两个步骤, 需要安装了oracle, 且配置了 libCommondao.so 的环境才能编译完成
-编译前把文件改名为 makefile
-```
+GeneSql.cpp 和 HandleData.cpp 代码一样, 只是把与数据库相关的注释掉, 方便在没有oracle的环境下编译 
+`make`的默认命令就是编译该文件
+
 
 ## 使用方法
 

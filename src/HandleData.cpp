@@ -126,8 +126,6 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
     */
 
     // 每n条数据输出到一个文件
-    // XXX 这里有点问题, 第一个文件会比 MaxCnt 小1
-    // if (g_count % atoi(strSqlFileCnt.c_str()) == 0)
     if (g_count >= atoi(strSqlFileCnt.c_str()) )
     {
         g_count = 0;
@@ -250,7 +248,11 @@ void ReadFile(const std::string &strFile, int iCommitCnt, pLineCallback pf)
     }
 }
 
-// 删除文件夹下所有文件
+/*
+ * @brief	: 删除文件夹下所有后缀为sql的文件
+ * @param	: 
+ * @return	: 
+ */
 void DeleteAllFile(const char* dirPath, const char *extenStr="sql")
 {
     DIR *dir  =  opendir(dirPath);
@@ -268,7 +270,11 @@ void DeleteAllFile(const char* dirPath, const char *extenStr="sql")
 }
 
 
-// 获取文件夹下所有extenStr后缀的文件名列表
+/*
+ * @brief	: 获取文件夹下所有extenStr后缀的文件名列表
+ * @param	: 
+ * @return	: 
+ */
 void GetAllFile(const char *dirPath, vector<string> &vecFileList, const char *extenStr = "sql")
 {
     DIR *dir = opendir(dirPath);
@@ -286,7 +292,7 @@ void GetAllFile(const char *dirPath, vector<string> &vecFileList, const char *ex
     closedir(dir);
 }
 
-// main函数命令
+// main函数命令 gene
 int GeneraCommand(string strFilePath)
 {
     int iRetCode;
@@ -323,7 +329,7 @@ int GeneraCommand(string strFilePath)
 
 
 
-// main函数命令
+// main函数命令 run
 int RunSqlCommand()
 {
     int iRetCode;
@@ -437,6 +443,7 @@ int RunSqlCommand()
     // fflush(fpInsert);
     return 0;
 }
+
 
 int main(int argc, char *argv[])
 {

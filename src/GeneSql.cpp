@@ -128,8 +128,6 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
     */
 
     // 每n条数据输出到一个文件
-    // XXX 这里有点问题, 第一个文件会比 MaxCnt 小1
-    // if (g_count % atoi(strSqlFileCnt.c_str()) == 0)
     if (g_count >= atoi(strSqlFileCnt.c_str()) )
     {
         g_count = 0;
