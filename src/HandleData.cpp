@@ -11,8 +11,10 @@
 #include <stdio.h>
 #include "DbfRead.h"
 #include "inifile.h"
+
 #include "dao_base.h"
 #include "dao_dynamicsql.h"
+
 using namespace inifile;
 
 int g_count = 0;
@@ -22,6 +24,11 @@ FILE *pf;
 FILE *fpInsert;
 IniFile ini;
 string g_strFile;
+
+string strSqlFileCnt;
+string strTableName;
+string strColumns;
+string strMaxCommitCnt;
 
 typedef void (*pLineCallback)(int iCnt, const char *pcszContent);
 
@@ -93,34 +100,19 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
 {
     int iColumnLen = 0;
     char szSql[2048] = {0};
-    char chBuff[1] = {0};
+    char chBuff[2] = {0};
     char buffer[1024] = {0};
     char szTempBuff[128] = {0};
-    string strValue;
     string strTmp;
-    string strColumns;
 
-    g_count++;
-
-    if (GetConfigValue(strValue, "SqlFileCnt") != RET_OK)
+    /*
+    // XXX 严重拖慢性能
+    if (GetConfigValue(strSqlFileCnt, "SqlFileCnt") != RET_OK)
     {
         printf("Get Config \"SqlFileCnt\" Failed!");
         abort();
     }
-
-    // 每n条数据输出到一个文件
-    // XXX 这里有点问题, 第一个文件会比 MaxCnt 小1
-    if (g_count % atoi(strValue.c_str()) == 0)
-    {
-        g_count = 0;
-        fclose(pf);
-        fileNo++;
-        pf = fopen(GetFileName(), "w+");
-        assert(pf);
-    }
-
-    // 组装sql语句  --  根据m_vecFieldHead从pcszContent提取记录数据
-    if (GetConfigValue(strValue, "TableName") != RET_OK)
+    if (GetConfigValue(strTableName, "TableName") != RET_OK)
     {
         printf("Get Config \"TableName\" Failed!\n");
         abort();
@@ -131,14 +123,31 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
         printf("Get Config \"Columns\" Failed!\n");
         abort();
     }
+    */
+
+    // 每n条数据输出到一个文件
+    // XXX 这里有点问题, 第一个文件会比 MaxCnt 小1
+    // if (g_count % atoi(strSqlFileCnt.c_str()) == 0)
+    if (g_count >= atoi(strSqlFileCnt.c_str()) )
+    {
+        g_count = 0;
+        fclose(pf);
+        fileNo++;
+        pf = fopen(GetFileName(), "w+");
+        assert(pf);
+    }
+    g_count++;
+
+    // 组装sql语句  --  根据m_vecFieldHead从pcszContent提取记录数据
     
-    snprintf(szSql, sizeof(szSql), "insert into %s values(", strValue.c_str());
+    snprintf(szSql, sizeof(szSql), "insert into %s values(", strTableName.c_str());
 
     for (int i = 0; i < vecFieldHead.size(); i++)
     {
         if (vecFieldHead[i].szName[0] != 0x00 && vecFieldHead[i].szName[0] != '\r')
         {
-            sprintf(chBuff, "%d", i + 1);
+            // sprintf(chBuff, "%d", i + 1); // 溢出
+            snprintf(chBuff, sizeof(chBuff), "%d", i + 1);
             memcpy(&iColumnLen, vecFieldHead[i].szLen, 1);
             memset(buffer, 0x00, sizeof(buffer));
 
@@ -173,7 +182,6 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
 
     fprintf(pf, "%s\n", szSql);
 }
-
 
 // 连接数据库
 // TODO 加密 肯定不能明文放在配置文件啊
@@ -283,9 +291,13 @@ int GeneraCommand(string strFilePath)
 {
     int iRetCode;
     string strSqlFileFolder;
-    if (GetConfigValue(strSqlFileFolder, "SqlFileFolder") != RET_OK)
+    if ((GetConfigValue(strSqlFileFolder, "SqlFileFolder") != RET_OK)
+        || (GetConfigValue(strSqlFileCnt, "SqlFileCnt") != RET_OK)
+        || (GetConfigValue(strTableName, "TableName") != RET_OK)
+        || (GetConfigValue(strColumns, "Columns") != RET_OK)
+    )
     {
-        printf("Get Config \"SqlFilePath\" Failed!\n");
+        printf("Get Config  Failed!\n");
         abort();
     }
     DeleteAllFile(strSqlFileFolder.c_str());
@@ -303,7 +315,6 @@ int GeneraCommand(string strFilePath)
     // 本打算根据dbf信息自动建表, 不太好, 因为多次执行的时候会冲突
     dbf.ReadHead();
 
-    // TODO 不够快
     dbf.Read(GenerateSql);
 
     fflush(pf);
@@ -426,7 +437,6 @@ int RunSqlCommand()
     // fflush(fpInsert);
     return 0;
 }
-
 
 int main(int argc, char *argv[])
 {

@@ -11,10 +11,10 @@
 #include <stdio.h>
 #include "DbfRead.h"
 #include "inifile.h"
-#include <chrono>
-#include <iostream>
-// #include "dao_base.h"
-// #include "dao_dynamicsql.h"
+/* xxx
+#include "dao_base.h"
+#include "dao_dynamicsql.h"
+*/
 using namespace inifile;
 
 int g_count = 0;
@@ -25,15 +25,17 @@ FILE *fpInsert;
 IniFile ini;
 string g_strFile;
 
-std::vector<char*> vecRes;
-string strSqlFileCnt = "100000";
-string strTable = "test";
-string strColumns = "@";
+string strSqlFileCnt;
+string strTableName;
+string strColumns;
+string strMaxCommitCnt;
 
 typedef void (*pLineCallback)(int iCnt, const char *pcszContent);
 
-// CDAOBase g_oDaoBaseHandler;
-// CDAODynamicSql g_oDaoDynamicSqlHandler;
+/* xxx
+CDAOBase g_oDaoBaseHandler;
+CDAODynamicSql g_oDaoDynamicSqlHandler;
+*/
 
 
 void trim(std::string &s)
@@ -105,15 +107,14 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
     char szTempBuff[128] = {0};
     string strTmp;
 
-    g_count++;
-
     /*
+    // XXX 严重拖慢性能
     if (GetConfigValue(strSqlFileCnt, "SqlFileCnt") != RET_OK)
     {
         printf("Get Config \"SqlFileCnt\" Failed!");
         abort();
     }
-    if (GetConfigValue(strTable, "TableName") != RET_OK)
+    if (GetConfigValue(strTableName, "TableName") != RET_OK)
     {
         printf("Get Config \"TableName\" Failed!\n");
         abort();
@@ -128,7 +129,8 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
 
     // 每n条数据输出到一个文件
     // XXX 这里有点问题, 第一个文件会比 MaxCnt 小1
-    if (g_count % atoi(strSqlFileCnt.c_str()) == 0)
+    // if (g_count % atoi(strSqlFileCnt.c_str()) == 0)
+    if (g_count >= atoi(strSqlFileCnt.c_str()) )
     {
         g_count = 0;
         fclose(pf);
@@ -136,17 +138,17 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
         pf = fopen(GetFileName(), "w+");
         assert(pf);
     }
+    g_count++;
 
     // 组装sql语句  --  根据m_vecFieldHead从pcszContent提取记录数据
-
     
-    snprintf(szSql, sizeof(szSql), "insert into %s values(", strTable.c_str());
+    snprintf(szSql, sizeof(szSql), "insert into %s values(", strTableName.c_str());
 
     for (int i = 0; i < vecFieldHead.size(); i++)
     {
         if (vecFieldHead[i].szName[0] != 0x00 && vecFieldHead[i].szName[0] != '\r')
         {
-            // sprintf(chBuff, "%d", i + 1);
+            // sprintf(chBuff, "%d", i + 1); // 溢出
             snprintf(chBuff, sizeof(chBuff), "%d", i + 1);
             memcpy(&iColumnLen, vecFieldHead[i].szLen, 1);
             memset(buffer, 0x00, sizeof(buffer));
@@ -180,121 +182,11 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
     snprintf(szTempBuff, sizeof(szTempBuff), "%s", ")");
     strncat(szSql, szTempBuff, sizeof(szSql) - strlen(szSql) - 1);
 
-    // fprintf(pf, "%s\n", szSql);
-    // fwrite(szSql.c_str(), strlen(szSql.c_str()), 1, pf);
-    fwrite(szSql, strlen(szSql), 1, pf);
-    fwrite("\n", strlen("\n"), 1, pf);
-    // fflush(pf);
+    fprintf(pf, "%s\n", szSql);
 }
 
-void StringSplitC(const char* pszString, const char* pszFlag, std::vector<char*>& vecRes)
-{
-   const char* p = strtok((char*)pszString, pszFlag);
-   while (p != NULL)
-   {
-     if(strlen(p) > 0)
-     {
-        vecRes.push_back((char*)p);
-     }
-
-     p = strtok(NULL, pszFlag);
-   }
-}
-
-
-// void GenSql(const char* pcszContent)
-void GenSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
-{
-	std::vector<std::string> vecFieldVal;
-	char* pos = (char*)pcszContent;
-    // std::vector<stFieldHead> stFieldArr = pDbfR->GetFieldArray();
-    std::vector<stFieldHead> stFieldArr = vecFieldHead;
-
-    
-    // FIXME 在里面创建文件非常慢
-    g_count++;
-
-    /*
-    if (GetConfigValue(strValue, "SqlFileCnt") != RET_OK)
-    {
-        printf("Get Config \"SqlFileCnt\" Failed!");
-        abort();
-    }
-    if (GetConfigValue(strTable, "TableName") != RET_OK)
-    {
-        printf("Get Config \"TableName\" Failed!\n");
-        abort();
-    }
-    */
-    if (g_count % atoi(strSqlFileCnt.c_str()) == 0)
-    {
-        g_count = 0;
-        fclose(pf);
-        fileNo++;
-        pf = fopen(GetFileName(), "w+");
-        assert(pf);
-    }
-	
-	std::vector<stFieldHead>::iterator ite = stFieldArr.begin();
-	for(; ite != stFieldArr.end(); ite++)
-	{
-		char chLen;
-		memcpy(&chLen, (*ite).szLen, 1);
-		
-		char szTmp[1024] = {0};
-		strncpy(szTmp, pos, (int)chLen);
-		pos = pos + (int)chLen;
-		
-		vecFieldVal.push_back(szTmp);
-	}
-	
-    std::string strSql = "insert into " + strTable + " values(";
-	std::vector<char*>::iterator itf = vecRes.begin();
-	for(; itf != vecRes.end(); itf++)
-	{
-		int index = atoi(*itf);
-		std::string strTmp = vecFieldVal[index-1];
-		trim(strTmp);
-		
-		if(itf != vecRes.end() - 1)
-		{
-			strSql = strSql + "'";
-			strSql = strSql + strTmp;
-			strSql = strSql + "', ";
-		}
-		else
-		{
-			strSql = strSql + "'";
-			strSql = strSql + strTmp;
-			strSql = strSql + "'";
-		}
-	}
-	
-	strSql = strSql + ")";
-	
-	fwrite(strSql.c_str(), strlen(strSql.c_str()), 1, pf);
-    fwrite("\n", strlen("\n"), 1, pf);
-}
-
-void ReadDbf(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
-{
-	if(g_count >= 100000)
-	{
-        g_count = 0;
-		fclose(pf);
-		fileNo++;
-		pf = fopen(GetFileName(), "w+");
-		assert(pf);
-	}
-
-    // GenerateSql(vecFieldHead,  pcszContent);
-    // GenSql(vecFieldHead,  pcszContent);
-
-	g_count++;
-}
-
-// 连接数据库
 /*
+// 连接数据库
 // TODO 加密 肯定不能明文放在配置文件啊
 int ConnectOracle(void)
 {
@@ -338,6 +230,7 @@ void SqlCommit(int iCommitCnt, const char* pcszSql)
     }
 
 }
+*/
 
 // 读入strFile文件行交给pf函数处理
 void ReadFile(const std::string &strFile, int iCommitCnt, pLineCallback pf)
@@ -360,7 +253,6 @@ void ReadFile(const std::string &strFile, int iCommitCnt, pLineCallback pf)
         free(line);
     }
 }
-*/
 
 // 删除文件夹下所有文件
 void DeleteAllFile(const char* dirPath, const char *extenStr="sql")
@@ -403,10 +295,13 @@ int GeneraCommand(string strFilePath)
 {
     int iRetCode;
     string strSqlFileFolder;
-    string strColumns;
-    if (GetConfigValue(strSqlFileFolder, "SqlFileFolder") != RET_OK)
+    if ((GetConfigValue(strSqlFileFolder, "SqlFileFolder") != RET_OK)
+        || (GetConfigValue(strSqlFileCnt, "SqlFileCnt") != RET_OK)
+        || (GetConfigValue(strTableName, "TableName") != RET_OK)
+        || (GetConfigValue(strColumns, "Columns") != RET_OK)
+    )
     {
-        printf("Get Config \"SqlFilePath\" Failed!\n");
+        printf("Get Config  Failed!\n");
         abort();
     }
     DeleteAllFile(strSqlFileFolder.c_str());
@@ -419,22 +314,13 @@ int GeneraCommand(string strFilePath)
     }
     assert(pf);
 
-    if (GetConfigValue(strColumns, "Columns") != RET_OK)
-    {
-        printf("Get Config \"Columns\" Failed!\n");
-        abort();
-    }
-
-    StringSplitC(strColumns.c_str(), ",", vecRes);
-
     CDbfRead dbf(strFilePath);
 
     // 本打算根据dbf信息自动建表, 不太好, 因为多次执行的时候会冲突
     dbf.ReadHead();
 
+    // TODO 不够快
     dbf.Read(GenerateSql);
-    // dbf.Read(GenSql);
-    // dbf.Read(ReadDbf);
 
     fflush(pf);
     return 0;
@@ -442,8 +328,8 @@ int GeneraCommand(string strFilePath)
 
 
 
-// main函数命令
 /*
+// main函数命令
 int RunSqlCommand()
 {
     int iRetCode;

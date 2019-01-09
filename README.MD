@@ -1,7 +1,13 @@
 [TOC]
 
-# 说明
+## 说明
 
+* makefile
+```
+makefile_genq 是单纯为编译生成sql的代码而写的, 不涉及数据库, 可直接make
+makefile_all  包括生成 sql 文件和插入数据两个步骤, 需要安装了oracle, 且配置了 libCommondao.so 的环境才能编译完成
+编译前把文件改名为 makefile
+```
 
 ## 使用方法
 
