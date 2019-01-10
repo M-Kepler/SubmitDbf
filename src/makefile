@@ -37,7 +37,7 @@ TARGET = ./main.out
 
 gensql: $^
 	@echo "===---===--===\nto general sql\n===---===---===\n"
-	g++ --std=c++11 -g -c  inifile.cpp -o inifile.o
+	g++ --std=c++11 -g -c inifile.cpp -o inifile.o
 	g++ --std=c++11 -g -c DbfRead.cpp -o DbfRead.o
 	g++ --std=c++11 -g  inifile.o DbfRead.o GeneSql.cpp -o gene_sql.out
 

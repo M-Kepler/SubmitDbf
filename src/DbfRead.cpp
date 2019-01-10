@@ -11,6 +11,8 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
+#include <fstream>
+using namespace std;
 
 CDbfRead::CDbfRead(const std::string &strFile)
     : m_nRecordNum(0),
@@ -284,5 +286,35 @@ int CDbfRead::ReadMmapOnce(pCallback pfn, int nPageNum)
 
     close(fd);
 
+    return 0;
+}
+
+int CDbfRead::ReadNoMmap(pCallback pfn)
+{
+    int j = 0;
+    long pPos; // 读取位置记录
+
+    fstream file;
+    file.open(m_strFile.c_str(), ios::binary | ios::in);
+    if (!file.is_open())
+    {
+        return -1;
+    }
+    file.seekg(0, ios::beg);
+
+    file.clear();
+    file.seekg(0, ios::end);
+    pPos = m_sFileHeadBytesNum + 1;
+
+    while (!file.eof())
+    {
+        char szBuf[2048] = {0};
+        file.seekg(pPos + j * m_sRecordSize);
+        file.read(szBuf, m_sRecordSize);
+        pfn(m_vecFieldHead, szBuf);
+        j++;
+    }
+
+    file.close();
     return 0;
 }

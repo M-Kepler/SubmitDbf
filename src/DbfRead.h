@@ -49,6 +49,7 @@ class CDbfRead
 
     /*
      * @brief:  读入dbf文件, 并进行文件内存映射, 读取每行数据记录给pfn处理
+     *          耗时: 184s
      * @param:  pfn         函数指针 
      * @param:  nPageNum    申请12800个页的内存大小; 12800 * 4k = 500M    
      * @return:
@@ -57,10 +58,19 @@ class CDbfRead
 
     /*
      * @brief	: 上面的接口以每次500m来映射, 该接口一次全部映射完
+     *            耗时: 217s
      * @param	: 
      * @return	: 
      */
     int ReadMmapOnce(pCallback pfn, int nPageNum = 128000);
+
+    /*
+     * @brief	: 不适用映射, 单纯地用fstream去读文件
+     *            耗时: 554s
+     * @param	: 
+     * @return	: 
+     */
+    int ReadNoMmap(pCallback pfn);
 
     int GetRecordNum()
     {

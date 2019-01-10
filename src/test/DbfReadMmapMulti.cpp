@@ -228,3 +228,10 @@ int CDbfRead::Read(pCallback pfn, int nPageNum)
     return 0;
 }
 
+/*
+ * 1.7G 2700w条记录的dbf文件测试耗时
+ * $ date && ./mainmmapmulti.out gene ../../dbf/qtzhzl100077.b09 && date
+ * Thu Jan 10 11:11:09 DST 2019
+ * Consume: 184s
+ * Thu Jan 10 11:14:13 DST 2019
+*/
