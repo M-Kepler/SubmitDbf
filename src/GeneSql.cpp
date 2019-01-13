@@ -180,7 +180,7 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
     snprintf(szTempBuff, sizeof(szTempBuff), "%s", ")");
     strncat(szSql, szTempBuff, sizeof(szSql) - strlen(szSql) - 1);
 
-    fprintf(pf, "%s\n", szSql);
+    fprintf(pf, "%s;\n", szSql);
 }
 
 /*

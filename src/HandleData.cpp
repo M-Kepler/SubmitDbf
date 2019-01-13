@@ -24,11 +24,12 @@ FILE *pf;
 FILE *fpInsert;
 IniFile ini;
 string g_strFile;
-
+vector<stFieldHead> vecColumns;
 string strSqlFileCnt;
 string strTableName;
 string strColumns;
 string strMaxCommitCnt;
+string strSqlFileFolder;
 
 typedef void (*pLineCallback)(int iCnt, const char *pcszContent);
 
@@ -181,6 +182,121 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
     fprintf(pf, "%s\n", szSql);
 }
 
+
+
+/*
+ * @brief	: 生成data文件, 以用sqlldr载入数据库
+ * @param	: 
+ * @return	: 
+ */
+void GenerateSqlLoader(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
+{
+    int iColumnLen = 0;
+    char szSql[2048] = {0};
+    char chBuff[2] = {0};
+    char buffer[1024] = {0};
+    char szTempBuff[128] = {0};
+    string strTmp;
+
+    for (int i = 0; i < vecFieldHead.size(); i++)
+    {
+        if (vecFieldHead[i].szName[0] != 0x00 && vecFieldHead[i].szName[0] != '\r')
+        {
+            // sprintf(chBuff, "%d", i + 1);
+            snprintf(chBuff, sizeof(chBuff), "%d", i + 1);
+            memcpy(&iColumnLen, vecFieldHead[i].szLen, 1);
+            memset(buffer, 0x00, sizeof(buffer));
+
+            // 按照需要指定需要插入的列
+            if ((strstr(strColumns.c_str(), chBuff) != NULL) || strcmp(strColumns.c_str(), "@") == 0)
+            {
+                memcpy(buffer, pcszContent, iColumnLen); // 按照字段长度拷贝内存
+                strTmp = string(buffer);
+                trim(strTmp);
+            }
+            else
+            {
+                strTmp  = ""; 
+            }
+            strncat(szSql, "\"", 1);
+            snprintf(szTempBuff, sizeof(szTempBuff), "%s", strTmp.c_str());
+            strncat(szSql, szTempBuff, sizeof(szSql) - strlen(szSql) - 1);
+            if (i < vecFieldHead.size() - 1)
+            {
+                strncat(szSql, "\",", 2);
+            }
+            else
+            {
+                strncat(szSql, "\"", 1);
+            }
+        }
+        pcszContent += iColumnLen; // 跳到下一个字段
+    }
+
+    fwrite(szSql, strlen(szSql), 1, pf);
+    fwrite("\n", strlen("\n"), 1, pf);
+    vecColumns = vecFieldHead;
+}
+
+/*
+ * @brief	: 利用 sqlldr 导入文本到 oracle
+ * @param   : vecFieldHead  字段vector
+ * @param	: TableName     导入目标表
+ * @param	: FileName      需要导入的文件
+ * @param	: strTok        文件字段间分隔符
+ * @param	: strScope      字段值的包含, 比如用双引号括住
+ * @return	: 
+ */
+int ImportDB(vector<stFieldHead> vecFieldHead, string TableName, string FileName, string strTok=",", string strSplit="\"")
+{
+    // 产生SQL*Loader控制文件
+    FILE *fctl;
+    FILE *fp;
+    int iStart = 1;
+    char execommand[256];
+    string sqlload = "./sqlload.ctl";
+
+    if ((fctl = fopen(sqlload.c_str(), "w")) == NULL)
+    {
+        return -1 ;
+    }
+    fprintf(fctl, "LOAD DATA\n");
+    fprintf(fctl, "INFILE '%s'\n", FileName.c_str());
+    fprintf(fctl, "APPEND INTO TABLE %s\n", TableName.c_str());
+    fprintf(fctl, "FIELDS TERMINATED BY \"%s\"\n", strTok.c_str());
+    fprintf(fctl, "Optionally enclosed by '%s'\n", strSplit.c_str()); // 不能用大写
+    fprintf(fctl, "TRAILING NULLCOLS\n");
+    fprintf(fctl, "(\n");
+
+    for (int i = 0; i < vecFieldHead.size(); i++)
+    {
+        if (vecFieldHead[i].szName[0] != 0x00 && vecFieldHead[i].szName[0] != '\r')
+        {
+            // fprintf(fctl, "%11s POSITION(%d:%d)", vecFieldHead[i].szName, iStart, *(int *)vecFieldHead[i] + iStart - 1);
+            // iStart += *(int *)vecFieldHead[i];
+            fprintf(fctl, "%11s", vecFieldHead[i].szName);
+            if (i < vecFieldHead.size() - 1)
+            {
+                fprintf(fctl, ",\n");
+            }
+        }
+    }
+    fprintf(fctl, "\n)\n");
+    fclose(fctl);
+
+    // TODO User, Pwd, Db替换成相应的值
+    // 执行系统命令
+    sprintf(Execommand, "sqlldr userid=%s/%s@%s control=%s", User, Pwd, DB, sqlload.c_str());
+    if (system(execommand) == -1)
+    {
+        // SQL*Loader执行错误
+        return -1;
+    }
+    return 0 ;
+}
+
+
+
 // 连接数据库
 // TODO 加密 肯定不能明文放在配置文件啊
 int ConnectOracle(void)
@@ -296,7 +412,6 @@ void GetAllFile(const char *dirPath, vector<string> &vecFileList, const char *ex
 int GeneraCommand(string strFilePath)
 {
     int iRetCode;
-    string strSqlFileFolder;
     if ((GetConfigValue(strSqlFileFolder, "SqlFileFolder") != RET_OK)
         || (GetConfigValue(strSqlFileCnt, "SqlFileCnt") != RET_OK)
         || (GetConfigValue(strTableName, "TableName") != RET_OK)
@@ -445,6 +560,16 @@ int RunSqlCommand()
 }
 
 
+int SqlLoadCommand()
+{
+    // TODO FileName为需要导入的文件
+    if (ImportDB(vecColumns, strTableName, string FileName) < 0)
+    {
+        printf("Load File Faile");
+        abort();
+    }
+}
+
 int main(int argc, char *argv[])
 {
     int iRetCode;
@@ -474,6 +599,14 @@ int main(int argc, char *argv[])
         if (iRetCode != 0)
         {
             printf("\nError while run sql, errorcode:%d", iRetCode);
+        }
+    }
+    if (strcmp(argv[1], "sqlldr") == 0)
+    {
+        iRetCode = SqlLoadCommand();
+        if (iRetCode != 0)
+        {
+            printf("\n SqlLoader Error" );
         }
     }
     

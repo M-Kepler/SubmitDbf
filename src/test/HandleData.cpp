@@ -13,6 +13,8 @@
 #include "inifile.h"
 #include <chrono>
 #include <iostream>
+#include <list>
+
 // #include "dao_base.h"
 // #include "dao_dynamicsql.h"
 using namespace inifile;
@@ -26,8 +28,9 @@ IniFile ini;
 string g_strFile;
 
 std::vector<char*> vecRes;
+std::vector<stFieldHead> vecColumns;
 string strSqlFileCnt = "100000";
-string strTable = "test";
+string strTable = "tmp_qtzhzl_181123";
 string strColumns = "@";
 
 typedef void (*pLineCallback)(int iCnt, const char *pcszContent);
@@ -183,8 +186,9 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
     // fprintf(pf, "%s\n", szSql);
     // fwrite(szSql.c_str(), strlen(szSql.c_str()), 1, pf);
     fwrite(szSql, strlen(szSql), 1, pf);
-    fwrite("\n", strlen("\n"), 1, pf);
+    fwrite(";\n", strlen(";\n"), 1, pf);
     // fflush(pf);
+    vecColumns = vecFieldHead;
 }
 
 void StringSplitC(const char* pszString, const char* pszFlag, std::vector<char*>& vecRes)
@@ -199,6 +203,104 @@ void StringSplitC(const char* pszString, const char* pszFlag, std::vector<char*>
 
      p = strtok(NULL, pszFlag);
    }
+}
+
+
+/*
+ * @brief	: 生成sql文件
+ * @param	: 
+ * @return	: 
+ */
+void GenerateSqlLoader(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
+{
+    int iColumnLen = 0;
+    char szSql[2048] = {0};
+    char chBuff[2] = {0};
+    char buffer[1024] = {0};
+    char szTempBuff[128] = {0};
+    string strTmp;
+
+    g_count++;
+
+    /*
+    if (GetConfigValue(strSqlFileCnt, "SqlFileCnt") != RET_OK)
+    {
+        printf("Get Config \"SqlFileCnt\" Failed!");
+        abort();
+    }
+    if (GetConfigValue(strTable, "TableName") != RET_OK)
+    {
+        printf("Get Config \"TableName\" Failed!\n");
+        abort();
+    }
+    
+    if (GetConfigValue(strColumns, "Columns") != RET_OK)
+    {
+        printf("Get Config \"Columns\" Failed!\n");
+        abort();
+    }
+    */
+
+    // 每n条数据输出到一个文件
+    // XXX 这里有点问题, 第一个文件会比 MaxCnt 小1
+    /*
+    if (g_count % atoi(strSqlFileCnt.c_str()) == 0)
+    {
+        g_count = 0;
+        fclose(pf);
+        fileNo++;
+        pf = fopen(GetFileName(), "w+");
+        assert(pf);
+    }
+    */
+
+    // 组装sql语句  --  根据m_vecFieldHead从pcszContent提取记录数据
+
+    
+    // snprintf(szSql, sizeof(szSql), "insert into %s values(", strTable.c_str());
+
+    for (int i = 0; i < vecFieldHead.size(); i++)
+    {
+        if (vecFieldHead[i].szName[0] != 0x00 && vecFieldHead[i].szName[0] != '\r')
+        {
+            // sprintf(chBuff, "%d", i + 1);
+            snprintf(chBuff, sizeof(chBuff), "%d", i + 1);
+            memcpy(&iColumnLen, vecFieldHead[i].szLen, 1);
+            memset(buffer, 0x00, sizeof(buffer));
+
+            // 按照需要指定需要插入的列
+            if ((strstr(strColumns.c_str(), chBuff) != NULL) || strcmp(strColumns.c_str(), "@") == 0)
+            {
+                memcpy(buffer, pcszContent, iColumnLen); // 按照字段长度拷贝内存
+                strTmp = string(buffer);
+                trim(strTmp);
+            }
+            else
+            {
+                strTmp  = ""; 
+            }
+            strncat(szSql, "\"", 1);
+            snprintf(szTempBuff, sizeof(szTempBuff), "%s", strTmp.c_str());
+            strncat(szSql, szTempBuff, sizeof(szSql) - strlen(szSql) - 1);
+            if (i < vecFieldHead.size() - 1)
+            {
+                strncat(szSql, "\",", 2);
+            }
+            else
+            {
+                strncat(szSql, "\"", 1);
+            }
+        }
+        pcszContent += iColumnLen; // 跳到下一个字段
+    }
+
+    // fprintf(pf, "%s\n", szSql);
+    // fwrite(szSql.c_str(), strlen(szSql.c_str()), 1, pf);
+    fwrite(szSql, strlen(szSql), 1, pf);
+    // fwrite(";\n", strlen(";\n"), 1, pf);
+    fwrite("\n", strlen("\n"), 1, pf);
+    // fflush(pf);
+    vecColumns = vecFieldHead;
 }
 
 
@@ -432,7 +534,8 @@ int GeneraCommand(string strFilePath)
     // 本打算根据dbf信息自动建表, 不太好, 因为多次执行的时候会冲突
     dbf.ReadHead();
 
-    dbf.Read(GenerateSql);
+    // dbf.Read(GenerateSql);
+    dbf.Read(GenerateSqlLoader);
     // dbf.Read(GenSql);
     // dbf.Read(ReadDbf);
 
@@ -559,6 +662,67 @@ int RunSqlCommand()
 }
 */
 
+/*----------------------------------------------------------------------------
+导入文本
+为了批量导入，在此我调用的sqlldr工具
+首先生成SQL*Loader控制文件，后运行sqlldr
+----------------------------------------------------------------------------*/
+/*
+ * @brief	: 利用 sqlldr 导入文本到 oracle
+ * @param   : vecFieldHead  字段vector
+ * @param	: TableName     导入目标表
+ * @param	: FileName      需要导入的文件
+ * @param	: strTok        文件字段间分隔符
+ * @param	: strScope      字段值的包含, 比如用双引号括住
+ * @return	: 
+ */
+int ImportDB(vector<stFieldHead> vecFieldHead, string TableName, string FileName, string strTok, string strSplit)
+{
+    // 产生SQL*Loader控制文件
+    FILE *fctl;
+    FILE *fp;
+    int iStart = 1;
+    char Execommand[256];
+    string sqlload = "./sql/sqlload.ctl";
+
+    if ((fctl = fopen(sqlload.c_str(), "w")) == NULL)
+    {
+        return -1 ;
+    }
+    fprintf(fctl, "LOAD DATA\n");
+    fprintf(fctl, "INFILE '%s'\n", FileName.c_str());
+    fprintf(fctl, "APPEND INTO TABLE %s\n", TableName.c_str());
+    fprintf(fctl, "FIELDS TERMINATED BY \"%s\"\n", strTok.c_str());
+    fprintf(fctl, "Optionally enclosed by '%s'\n", strSplit.c_str()); // 不能用大写
+    fprintf(fctl, "TRAILING NULLCOLS\n");
+    fprintf(fctl, "(\n");
+
+    for (int i = 0; i < vecFieldHead.size(); i++)
+    {
+        if (vecFieldHead[i].szName[0] != 0x00 && vecFieldHead[i].szName[0] != '\r')
+        {
+            // fprintf(fctl, "%11s POSITION(%d:%d)", vecFieldHead[i].szName, iStart, *(int *)vecFieldHead[i] + iStart - 1);
+            // iStart += *(int *)vecFieldHead[i];
+            fprintf(fctl, "%11s", vecFieldHead[i].szName);
+            if (i < vecFieldHead.size() - 1)
+            {
+                fprintf(fctl, ",\n");
+            }
+        }
+    }
+    fprintf(fctl, "\n)\n");
+    fclose(fctl);
+
+    // 执行系统命令
+    sprintf(Execommand, "sqlldr userid=%s/%s@%s control=%s", User, Pwd, DB, sqlload.c_str());
+    if (system(Execommand) == -1)
+    {
+        // SQL*Loader执行错误
+        return -1;
+    }
+    return 0 ;
+}
+
 int main(int argc, char *argv[])
 {
     int iRetCode;
@@ -582,6 +746,19 @@ int main(int argc, char *argv[])
             printf("Error while generate sql file");
         }
     }
+    if (strcmp(argv[1], "sqlldr") == 0)
+    {
+        if (GeneraCommand(argv[2]) != 0)
+        {
+            printf("Error while generate sql file");
+        }
+        if (ImportDB(vecColumns, "tmp_data_check_rst", "data.dat", ",", "\""))
+        {
+            printf("Error while generate sql control file");
+        }
+    }
+
+
     /*
     if (strcmp(argv[1], "run") == 0 || strcmp(argv[1], "batch") == 0)
     {
