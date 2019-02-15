@@ -11,7 +11,6 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-
 CDbfRead::CDbfRead(const std::string &strFile)
     : m_nRecordNum(0),
       m_sFileHeadBytesNum(0),
@@ -27,9 +26,9 @@ CDbfRead::~CDbfRead(void)
 int CDbfRead::ReadHead()
 {
     char szHead[32] = {0};
-    int fieldLen;           // 数据记录长度
-    int filedCount;         // 数据记录数量
-    char *pField;           // 数据记录开始的位置
+    int fieldLen;   // 数据记录长度
+    int filedCount; // 数据记录数量
+    char *pField;   // 数据记录开始的位置
 
     if (m_strFile.empty())
     {
@@ -52,7 +51,7 @@ int CDbfRead::ReadHead()
     memcpy(&m_sFileHeadBytesNum, &szHead[8], 2); // dbf二进制文件中文件头字节数
     memcpy(&m_sRecordSize, &szHead[10], 2);      // 每行记录所占空间 + 末尾一位标识符
 
-    fieldLen = m_sFileHeadBytesNum - 32;         // 文件头去除前32个描述文件属性的字节后, 得到字段信息的长度
+    fieldLen = m_sFileHeadBytesNum - 32; // 文件头去除前32个描述文件属性的字节后, 得到字段信息的长度
     pField = (char *)malloc(fieldLen);
 
     if (!pField)
@@ -93,21 +92,92 @@ int CDbfRead::ReadHead()
     return 0;
 }
 
+int CDbfRead::AddHead(std::vector<stFieldHead> vecField)
+{
+    time_t now;
+    FILE *newDbf;
+    stDbfHead dbfHead;
+    int iFieldCnt = 0; // 确定文件头大小需要知道字段数
+    short offset = 0;
+    short recsize = 0;
+    char chFieldEndFlag = 0x0d; // 字段定义终止标志
+    char chFileEndFlag = 0x1A;  // 文件结束标志
+
+    time(&now);
+    tm *tp = localtime(&now);
+
+    iFieldCnt = vecField.size();
+    offset = (short)(sizeof(stDbfHead) + (iFieldCnt * sizeof(stFieldHead)) + 1);
+
+    for (auto x : vecField)
+    {
+        recsize += x.szLen[0];
+    }
+
+    // 初始化文件头
+    memset(&dbfHead, 0x00, sizeof(stDbfHead));
+    dbfHead.szMark[0] = 0x03;
+    memmove(&dbfHead.szYear, &tp->tm_year, sizeof(dbfHead.szYear));
+    memmove(&dbfHead.szMonth, &tp->tm_mon, sizeof(dbfHead.szMonth));
+    memmove(&dbfHead.szDay, &tp->tm_mday, sizeof(dbfHead.szDay));
+    memmove(&dbfHead.szDataOffset, &offset, sizeof(dbfHead.szDataOffset));
+    memmove(&dbfHead.szRecSize, &recsize, sizeof(dbfHead.szRecSize));
+
+    newDbf = fopen("./data.dbf", "wb");
+    // 写文件头
+    if (fwrite(&dbfHead, sizeof(dbfHead), 1, newDbf) < 1)
+    {
+        fclose(newDbf);
+        newDbf = NULL;
+        return -2;
+    }
+
+    // 写字段
+    for (unsigned i = 0; i < iFieldCnt; ++i)
+    {
+        if (fwrite(&vecField[i], sizeof(stFieldHead), 1, newDbf) < 1)
+        {
+            fclose(newDbf);
+            newDbf = NULL;
+            return -2;
+        }
+    }
+
+    // 加上字段定义结束标记
+    if (fwrite(&chFieldEndFlag, 1, 1, newDbf) < 1)
+    {
+        fclose(newDbf);
+        newDbf = NULL;
+        return -2;
+    }
+
+    // 加上文件结束标记
+    if (fwrite(&chFileEndFlag, 1, 1, newDbf) < 1)
+    {
+        fclose(newDbf);
+        newDbf = NULL;
+        return -2;
+    }
+
+    fclose(newDbf);
+    newDbf = NULL;
+    return 0;
+}
 
 int CDbfRead::Read(pCallback pfn, int nPageNum)
 {
     int fd;
-    int mmapCount = 0;              // 根据文件大小定映射次数, ??? 为什么不一次映射完
-    char *pPos = NULL;              // 读取位置记录
+    int mmapCount = 0; // 根据文件大小定映射次数, ??? 为什么不一次映射完
+    char *pPos = NULL; // 读取位置记录
     struct stat stat;
-    size_t mmapSize;                // 一次映射的长度大小, 必须是页的整数倍;不满一页也要分配一页空间
-                                    // 虽然多出来的空间会清零,32位机器上1页是4k大小
-    size_t totalSize;               // 保存一次映射中未处理的数据记录的大小
-    size_t remainFileSize;          // dbf文件的未映射到内存区域的大小
-    int remainLen = 0;              // 一条记录被分在A,B页, 保存被截断的记录在A页页尾的长度
-    int tailLen = 0;                // 一条记录被分在A,B页, 保存被截断的记录在B页页头的长度
-    char remainBuf[2048] = {0};     // 一条记录被分在A,B页, 保存被截断的那条记录在A页中的数据
-    char firstRecord[1024] = {0};   // 一条记录被分在A,B页, 保存被截断的那条记录
+    size_t mmapSize;              // 一次映射的长度大小, 必须是页的整数倍;不满一页也要分配一页空间
+                                  // 虽然多出来的空间会清零,32位机器上1页是4k大小
+    size_t totalSize;             // 保存一次映射中未处理的数据记录的大小
+    size_t remainFileSize;        // dbf文件的未映射到内存区域的大小
+    int remainLen = 0;            // 一条记录被分在A,B页, 保存被截断的记录在A页页尾的长度
+    int tailLen = 0;              // 一条记录被分在A,B页, 保存被截断的记录在B页页头的长度
+    char remainBuf[2048] = {0};   // 一条记录被分在A,B页, 保存被截断的那条记录在A页中的数据
+    char firstRecord[1024] = {0}; // 一条记录被分在A,B页, 保存被截断的那条记录
 
     fd = open(m_strFile.c_str(), O_RDONLY, 0);
     if (fd < 0)

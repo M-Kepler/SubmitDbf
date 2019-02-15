@@ -24,7 +24,7 @@ FILE *pf;
 FILE *fpInsert;
 IniFile ini;
 string g_strFile;
-vector<stFieldHead> vecColumns;
+vector<stFieldHead> vecColumns; // 保存dbf的字段属性
 string strSqlFileCnt;
 string strTableName;
 string strColumns;
@@ -49,7 +49,6 @@ void trim(std::string &s)
 int GetConfigValue(string &strValue, string strKey, string strSection="CONFIG")
 {
     int iRetCode;
-    iRetCode = ini.load("./config.ini");
     if (iRetCode != RET_OK)
     {
         return RET_ERR;
@@ -81,7 +80,7 @@ const char *GetFileName(void)
         printf("Get Config \"SqlFilePath\" Failed!\n");
         abort();
     }
-    
+
     memset(szFileName, 0, sizeof(szFileName));
     snprintf(szFileName, sizeof(szFileName), "/sql_%4.4d", fileNo);
 
@@ -94,8 +93,8 @@ const char *GetFileName(void)
 
 /*
  * @brief	: 生成sql文件
- * @param	: 
- * @return	: 
+ * @param	:
+ * @return	:
  */
 void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
 {
@@ -118,7 +117,7 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
         printf("Get Config \"TableName\" Failed!\n");
         abort();
     }
-    
+
     if (GetConfigValue(strColumns, "Columns") != RET_OK)
     {
         printf("Get Config \"Columns\" Failed!\n");
@@ -138,7 +137,7 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
     g_count++;
 
     // 组装sql语句  --  根据m_vecFieldHead从pcszContent提取记录数据
-    
+
     snprintf(szSql, sizeof(szSql), "insert into %s values(", strTableName.c_str());
 
     for (int i = 0; i < vecFieldHead.size(); i++)
@@ -159,7 +158,7 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
             }
             else
             {
-                strTmp  = ""; 
+                strTmp  = "";
             }
             strncat(szSql, "\'", 1);
             snprintf(szTempBuff, sizeof(szTempBuff), "%s", strTmp.c_str());
@@ -186,8 +185,8 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
 
 /*
  * @brief	: 生成data文件, 以用sqlldr载入数据库
- * @param	: 
- * @return	: 
+ * @param	:
+ * @return	:
  */
 void GenerateSqlLoader(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
 {
@@ -216,7 +215,7 @@ void GenerateSqlLoader(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
             }
             else
             {
-                strTmp  = ""; 
+                strTmp  = "";
             }
             strncat(szSql, "\"", 1);
             snprintf(szTempBuff, sizeof(szTempBuff), "%s", strTmp.c_str());
@@ -245,7 +244,7 @@ void GenerateSqlLoader(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
  * @param	: FileName      需要导入的文件
  * @param	: strTok        文件字段间分隔符
  * @param	: strScope      字段值的包含, 比如用双引号括住
- * @return	: 
+ * @return	:
  */
 int ImportDB(vector<stFieldHead> vecFieldHead, string TableName, string FileName, string strTok=",", string strSplit="\"")
 {
@@ -366,8 +365,8 @@ void ReadFile(const std::string &strFile, int iCommitCnt, pLineCallback pf)
 
 /*
  * @brief	: 删除文件夹下所有后缀为sql的文件
- * @param	: 
- * @return	: 
+ * @param	:
+ * @return	:
  */
 void DeleteAllFile(const char* dirPath, const char *extenStr="sql")
 {
@@ -388,8 +387,8 @@ void DeleteAllFile(const char* dirPath, const char *extenStr="sql")
 
 /*
  * @brief	: 获取文件夹下所有extenStr后缀的文件名列表
- * @param	: 
- * @return	: 
+ * @param	:
+ * @return	:
  */
 void GetAllFile(const char *dirPath, vector<string> &vecFileList, const char *extenStr = "sql")
 {
@@ -424,7 +423,7 @@ int GeneraCommand(string strFilePath)
     DeleteAllFile(strSqlFileFolder.c_str());
 
     pf = fopen(GetFileName(), "w+");
-    
+
     if (!pf)
     {
         return -1;
@@ -474,7 +473,7 @@ int RunSqlCommand()
     }
 
     fpInsert = fopen(strLogFile.c_str(), "w+");
-    
+
     if (!fpInsert)
     {
         return -1;
@@ -519,7 +518,7 @@ int RunSqlCommand()
             break;
         }
     }
-    if(status == -1) 
+    if(status == -1)
     {
         printf("error on fork");
     }
@@ -552,14 +551,14 @@ int RunSqlCommand()
         // parent process
         printf("par process:%d\t%d\t\n", getpid(), i);
     }
-    // end 
+    // end
 
     fclose(fpInsert);
     // fflush(fpInsert);
     return 0;
 }
 
-
+// main函数命令 sqlldr
 int SqlLoadCommand()
 {
     // TODO FileName为需要导入的文件
@@ -570,11 +569,82 @@ int SqlLoadCommand()
     }
 }
 
+// main函数命令 2dbf
+int Csv2DbfCommand(string strFilePath)
+{
+    int iRetCode;
+    vector<string> vecDbfColumns;
+    std::vector<stFieldHead> vecFieldHead;
+
+    iRetCode = ini.getValues("DBF", "FIELD", vecDbfColumns);
+    if(iRetCode != 0)
+    {
+        printf("Get Config \"FIELD\" Failed!\n");
+        abort();
+    }
+
+    // 解析配置中的字段属性组装成 stFieldHead 结构体
+    for (auto x : vecDbfColumns)
+    {
+        string strTmp;
+        stFieldHead stFieldTmp;
+        memset(&stFieldTmp, 0x00, sizeof(stFieldHead));
+        if (x.find("NAME") != string::npos)
+        {
+            strTmp =  GetMsgValue(x, "NAME",",");
+            memcpy(stFieldTmp.szName,strTmp.c_str(),strTmp.length());
+        }
+        if (x.find("TYPE") != string::npos)
+        {
+            strTmp =  GetMsgValue(x, "TYPE",",");
+            memcpy(stFieldTmp.szType,strTmp.c_str(),strTmp.length());
+        }
+        if (x.find("OFFSET") != string::npos)
+        {
+            strTmp =  GetMsgValue(x, "OFFSET",",");
+            memcpy(stFieldTmp.szOffset,strTmp.c_str(),strTmp.length());
+        }
+        if (x.find("LEN") != string::npos)
+        {
+            int iTmp =  atoi(GetMsgValue(x, "LEN",",").c_str());
+            memcpy(stFieldTmp.szLen, &iTmp,strTmp.length());
+        }
+        if (x.find("PRECISION") != string::npos)
+        {
+            strTmp =  GetMsgValue(x, "PRECISION",",");
+            memcpy(stFieldTmp.szPrecision,strTmp.c_str(),strTmp.length());
+        }
+        if (x.find("RESV2") != string::npos)
+        {
+            strTmp =  GetMsgValue(x, "RESV2",",");
+            memcpy(stFieldTmp.szResv2,strTmp.c_str(),strTmp.length());
+        }
+        if (x.find("ID") != string::npos)
+        {
+            strTmp =  GetMsgValue(x, "ID",",");
+            memcpy(stFieldTmp.szId,strTmp.c_str(),strTmp.length());
+        }
+        if (x.find("RESV3") != string::npos)
+        {
+            strTmp =  GetMsgValue(x, "RESV3",",");
+            memcpy(stFieldTmp.szResv3,strTmp.c_str(),strTmp.length());
+        }
+        vecFieldHead.push_back(stFieldTmp);
+    }
+
+    CDbfRead dbf;
+    dbf.AddHead(vecFieldHead);
+
+    return 0;
+}
+
+
 int main(int argc, char *argv[])
 {
     int iRetCode;
     long lBeginStampTimes;
     long lEndStampTimes;
+    iRetCode = ini.load("./config.ini");
 
     if (2 != argc && 3 != argc)
     {
@@ -586,6 +656,7 @@ int main(int argc, char *argv[])
     }
 
     lBeginStampTimes = time(NULL);
+
     if (strcmp(argv[1], "gene") == 0 || strcmp(argv[1], "batch") == 0)
     {
         if (GeneraCommand(argv[2]) != 0)
@@ -601,6 +672,7 @@ int main(int argc, char *argv[])
             printf("\nError while run sql, errorcode:%d", iRetCode);
         }
     }
+
     if (strcmp(argv[1], "sqlldr") == 0)
     {
         iRetCode = SqlLoadCommand();
@@ -609,7 +681,16 @@ int main(int argc, char *argv[])
             printf("\n SqlLoader Error" );
         }
     }
-    
+
+    if (strcmp(argv[1], "2dbf") == 0)
+    {
+        iRetCode = Csv2DbfCommand();
+        if (iRetCode != 0)
+        {
+            printf("\n SqlLoader Error" );
+        }
+    }
+
     lEndStampTimes = time(NULL);
 
     printf("Consume: %lds\n", (lEndStampTimes - lBeginStampTimes));

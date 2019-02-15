@@ -28,7 +28,7 @@ IniFile ini;
 string g_strFile;
 
 std::vector<char*> vecRes;
-std::vector<stFieldHead> vecColumns;
+std::vector<stFieldHead> vecColumns; // 保存dbf文件的字段属性
 string strSqlFileCnt = "100000";
 string strTable = "tmp_qtzhzl_181123";
 string strColumns = "@";
@@ -37,6 +37,39 @@ typedef void (*pLineCallback)(int iCnt, const char *pcszContent);
 
 // CDAOBase g_oDaoBaseHandler;
 // CDAODynamicSql g_oDaoDynamicSqlHandler;
+
+string GetMsgValue(string strOrig, string strKey, string strSplit = ",")
+{
+	string strRetValue = "";
+	int iStrOrigLen;
+	int iStrKeyLen;
+	size_t uiPosKeyBegin;
+	size_t uiPosKeyEnd;
+	size_t uiPosStrSplit;
+
+	iStrOrigLen = strOrig.length();
+	iStrKeyLen = strKey.length();
+	uiPosKeyBegin = strOrig.find(strKey);
+
+	if (uiPosKeyBegin != string::npos)
+	{
+		// 从key的位置开始,第一次出现 str_split 的位置
+		uiPosStrSplit =  strOrig.substr(uiPosKeyBegin).find(strSplit);
+		if (uiPosStrSplit != string::npos)
+		{
+			uiPosKeyEnd = uiPosKeyBegin + uiPosStrSplit;
+		}
+		else
+		{
+			uiPosKeyEnd = iStrOrigLen;
+		}
+		int pos_begin = uiPosKeyBegin + iStrKeyLen + 1; // +1 跳过'='字符
+		int value_len = uiPosKeyEnd - pos_begin;
+		strRetValue = strOrig.substr(pos_begin, value_len);
+		return strRetValue;
+	}
+	return strRetValue;
+}
 
 
 void trim(std::string &s)
@@ -51,11 +84,7 @@ void trim(std::string &s)
 int GetConfigValue(string &strValue, string strKey, string strSection="CONFIG")
 {
     int iRetCode;
-    iRetCode = ini.load("./config.ini");
-    if (iRetCode != RET_OK)
-    {
-        return RET_ERR;
-    }
+
     iRetCode = ini.getValue(strSection, strKey, strValue);
     if (iRetCode != RET_OK)
     {
@@ -83,7 +112,7 @@ const char *GetFileName(void)
         printf("Get Config \"SqlFilePath\" Failed!\n");
         abort();
     }
-    
+
     memset(szFileName, 0, sizeof(szFileName));
     snprintf(szFileName, sizeof(szFileName), "/sql_%4.4d", fileNo);
 
@@ -96,8 +125,8 @@ const char *GetFileName(void)
 
 /*
  * @brief	: 生成sql文件
- * @param	: 
- * @return	: 
+ * @param	:
+ * @return	:
  */
 void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
 {
@@ -121,7 +150,7 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
         printf("Get Config \"TableName\" Failed!\n");
         abort();
     }
-    
+
     if (GetConfigValue(strColumns, "Columns") != RET_OK)
     {
         printf("Get Config \"Columns\" Failed!\n");
@@ -142,7 +171,7 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
 
     // 组装sql语句  --  根据m_vecFieldHead从pcszContent提取记录数据
 
-    
+
     snprintf(szSql, sizeof(szSql), "insert into %s values(", strTable.c_str());
 
     for (int i = 0; i < vecFieldHead.size(); i++)
@@ -163,7 +192,7 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
             }
             else
             {
-                strTmp  = ""; 
+                strTmp  = "";
             }
             strncat(szSql, "\'", 1);
             snprintf(szTempBuff, sizeof(szTempBuff), "%s", strTmp.c_str());
@@ -207,11 +236,11 @@ void StringSplitC(const char* pszString, const char* pszFlag, std::vector<char*>
 
 
 /*
- * @brief	: 生成sql文件
- * @param	: 
- * @return	: 
+ * @brief	: csv格式文件(默认用双引号包括数据, 用逗号分隔数据)
+ * @param	:
+ * @return	:
  */
-void GenerateSqlLoader(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
+void GenerateSqlLoaderData(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
 {
     int iColumnLen = 0;
     char szSql[2048] = {0};
@@ -233,7 +262,7 @@ void GenerateSqlLoader(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
         printf("Get Config \"TableName\" Failed!\n");
         abort();
     }
-    
+
     if (GetConfigValue(strColumns, "Columns") != RET_OK)
     {
         printf("Get Config \"Columns\" Failed!\n");
@@ -256,7 +285,7 @@ void GenerateSqlLoader(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
 
     // 组装sql语句  --  根据m_vecFieldHead从pcszContent提取记录数据
 
-    
+
     // snprintf(szSql, sizeof(szSql), "insert into %s values(", strTable.c_str());
 
     for (int i = 0; i < vecFieldHead.size(); i++)
@@ -277,7 +306,7 @@ void GenerateSqlLoader(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
             }
             else
             {
-                strTmp  = ""; 
+                strTmp  = "";
             }
             strncat(szSql, "\"", 1);
             snprintf(szTempBuff, sizeof(szTempBuff), "%s", strTmp.c_str());
@@ -303,7 +332,6 @@ void GenerateSqlLoader(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
     vecColumns = vecFieldHead;
 }
 
-
 // void GenSql(const char* pcszContent)
 void GenSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
 {
@@ -312,7 +340,7 @@ void GenSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
     // std::vector<stFieldHead> stFieldArr = pDbfR->GetFieldArray();
     std::vector<stFieldHead> stFieldArr = vecFieldHead;
 
-    
+
     // FIXME 在里面创建文件非常慢
     g_count++;
 
@@ -336,20 +364,20 @@ void GenSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
         pf = fopen(GetFileName(), "w+");
         assert(pf);
     }
-	
+
 	std::vector<stFieldHead>::iterator ite = stFieldArr.begin();
 	for(; ite != stFieldArr.end(); ite++)
 	{
 		char chLen;
 		memcpy(&chLen, (*ite).szLen, 1);
-		
+
 		char szTmp[1024] = {0};
 		strncpy(szTmp, pos, (int)chLen);
 		pos = pos + (int)chLen;
-		
+
 		vecFieldVal.push_back(szTmp);
 	}
-	
+
     std::string strSql = "insert into " + strTable + " values(";
 	std::vector<char*>::iterator itf = vecRes.begin();
 	for(; itf != vecRes.end(); itf++)
@@ -357,7 +385,7 @@ void GenSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
 		int index = atoi(*itf);
 		std::string strTmp = vecFieldVal[index-1];
 		trim(strTmp);
-		
+
 		if(itf != vecRes.end() - 1)
 		{
 			strSql = strSql + "'";
@@ -371,9 +399,9 @@ void GenSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
 			strSql = strSql + "'";
 		}
 	}
-	
+
 	strSql = strSql + ")";
-	
+
 	fwrite(strSql.c_str(), strlen(strSql.c_str()), 1, pf);
     fwrite("\n", strlen("\n"), 1, pf);
 }
@@ -514,7 +542,7 @@ int GeneraCommand(string strFilePath)
     DeleteAllFile(strSqlFileFolder.c_str());
 
     pf = fopen(GetFileName(), "w+");
-    
+
     if (!pf)
     {
         return -1;
@@ -535,7 +563,7 @@ int GeneraCommand(string strFilePath)
     dbf.ReadHead();
 
     // dbf.Read(GenerateSql);
-    dbf.Read(GenerateSqlLoader);
+    dbf.Read(GenerateSqlLoaderData);
     // dbf.Read(GenSql);
     // dbf.Read(ReadDbf);
 
@@ -544,6 +572,84 @@ int GeneraCommand(string strFilePath)
 }
 
 
+void SetDate(unsigned char* date)
+{
+	time_t now;
+	time(&now);
+	tm* tp = localtime(&now);
+
+	date[0] = tp->tm_year % 100;
+	date[1] = tp->tm_mon + 1;
+	date[2] = tp->tm_mday;
+}
+
+int Csv2DbfCommand(string strFilePath)
+{
+    int iRetCode;
+    vector<string> vecDbfColumns;
+    std::vector<stFieldHead> vecFieldHead;
+
+    iRetCode = ini.getValues("DBF", "FIELD", vecDbfColumns);
+    if(iRetCode != 0)
+    {
+        printf("Get Config \"FIELD\" Failed!\n");
+        abort();
+    }
+
+    // 解析配置中的字段属性组装成 stFieldHead 结构体
+    for (auto x : vecDbfColumns)
+    {
+        string strTmp;
+        stFieldHead stFieldTmp;
+        memset(&stFieldTmp, 0x00, sizeof(stFieldHead));
+        if (x.find("NAME") != string::npos)
+        {
+            strTmp =  GetMsgValue(x, "NAME",",");
+            memcpy(stFieldTmp.szName,strTmp.c_str(),strTmp.length());
+        }
+        if (x.find("TYPE") != string::npos)
+        {
+            strTmp =  GetMsgValue(x, "TYPE",",");
+            memcpy(stFieldTmp.szType,strTmp.c_str(),strTmp.length());
+        }
+        if (x.find("OFFSET") != string::npos)
+        {
+            strTmp =  GetMsgValue(x, "OFFSET",",");
+            memcpy(stFieldTmp.szOffset,strTmp.c_str(),strTmp.length());
+        }
+        if (x.find("LEN") != string::npos)
+        {
+            int iTmp =  atoi(GetMsgValue(x, "LEN",",").c_str());
+            memcpy(stFieldTmp.szLen, &iTmp,strTmp.length());
+        }
+        if (x.find("PRECISION") != string::npos)
+        {
+            strTmp =  GetMsgValue(x, "PRECISION",",");
+            memcpy(stFieldTmp.szPrecision,strTmp.c_str(),strTmp.length());
+        }
+        if (x.find("RESV2") != string::npos)
+        {
+            strTmp =  GetMsgValue(x, "RESV2",",");
+            memcpy(stFieldTmp.szResv2,strTmp.c_str(),strTmp.length());
+        }
+        if (x.find("ID") != string::npos)
+        {
+            strTmp =  GetMsgValue(x, "ID",",");
+            memcpy(stFieldTmp.szId,strTmp.c_str(),strTmp.length());
+        }
+        if (x.find("RESV3") != string::npos)
+        {
+            strTmp =  GetMsgValue(x, "RESV3",",");
+            memcpy(stFieldTmp.szResv3,strTmp.c_str(),strTmp.length());
+        }
+        vecFieldHead.push_back(stFieldTmp);
+    }
+
+    CDbfRead dbf;
+    dbf.AddHead(vecFieldHead);
+
+    return 0;
+}
 
 // main函数命令
 /*
@@ -576,7 +682,7 @@ int RunSqlCommand()
     }
 
     fpInsert = fopen(strLogFile.c_str(), "w+");
-    
+
     if (!fpInsert)
     {
         return -1;
@@ -621,7 +727,7 @@ int RunSqlCommand()
             break;
         }
     }
-    if(status == -1) 
+    if(status == -1)
     {
         printf("error on fork");
     }
@@ -654,7 +760,7 @@ int RunSqlCommand()
         // parent process
         printf("par process:%d\t%d\t\n", getpid(), i);
     }
-    // end 
+    // end
 
     fclose(fpInsert);
     // fflush(fpInsert);
@@ -674,7 +780,7 @@ int RunSqlCommand()
  * @param	: FileName      需要导入的文件
  * @param	: strTok        文件字段间分隔符
  * @param	: strScope      字段值的包含, 比如用双引号括住
- * @return	: 
+ * @return	:
  */
 int ImportDB(vector<stFieldHead> vecFieldHead, string TableName, string FileName, string strTok, string strSplit)
 {
@@ -689,12 +795,13 @@ int ImportDB(vector<stFieldHead> vecFieldHead, string TableName, string FileName
     {
         return -1 ;
     }
+    // fprintf(fctl, "OPTIONS(rows=128)\n");
     fprintf(fctl, "LOAD DATA\n");
     fprintf(fctl, "INFILE '%s'\n", FileName.c_str());
     fprintf(fctl, "APPEND INTO TABLE %s\n", TableName.c_str());
-    fprintf(fctl, "FIELDS TERMINATED BY \"%s\"\n", strTok.c_str());
-    fprintf(fctl, "Optionally enclosed by '%s'\n", strSplit.c_str()); // 不能用大写
-    fprintf(fctl, "TRAILING NULLCOLS\n");
+    fprintf(fctl, "FIELDS TERMINATED BY \"%s\"\n", strTok.c_str());   // 用于分割一行中各个属性值的符号
+    fprintf(fctl, "Optionally enclosed by '%s'\n", strSplit.c_str()); // 数据中每个字段用 '"' 框起
+    fprintf(fctl, "TRAILING NULLCOLS\n");                             // 表的字段没有对应的值时允 许为空
     fprintf(fctl, "(\n");
 
     for (int i = 0; i < vecFieldHead.size(); i++)
@@ -714,10 +821,10 @@ int ImportDB(vector<stFieldHead> vecFieldHead, string TableName, string FileName
     fclose(fctl);
 
     // 执行系统命令
-    sprintf(Execommand, "sqlldr userid=%s/%s@%s control=%s", User, Pwd, DB, sqlload.c_str());
+    // sprintf(Execommand, "sqlldr userid=%s/%s@%s control=%s", User, Pwd, DB, sqlload.c_str());
     if (system(Execommand) == -1)
     {
-        // SQL*Loader执行错误
+        // SQL*Loader 执行错误
         return -1;
     }
     return 0 ;
@@ -728,6 +835,12 @@ int main(int argc, char *argv[])
     int iRetCode;
     long lBeginStampTimes;
     long lEndStampTimes;
+
+    iRetCode = ini.load("./config.ini");
+    if (iRetCode != RET_OK)
+    {
+        return RET_ERR;
+    }
 
     if (2 != argc && 3 != argc)
     {
@@ -757,24 +870,18 @@ int main(int argc, char *argv[])
             printf("Error while generate sql control file");
         }
     }
-
-
-    /*
-    if (strcmp(argv[1], "run") == 0 || strcmp(argv[1], "batch") == 0)
+    // TODO csv转dbf
+    if (strcmp(argv[1], "2dbf") == 0 )
     {
-        iRetCode = RunSqlCommand();
-        if (iRetCode != 0)
+        if (Csv2DbfCommand(argv[2]) != 0)
         {
             printf("\nError while run sql, errorcode:%d", iRetCode);
         }
     }
-    */
-    
+
     lEndStampTimes = time(NULL);
 
     printf("Consume: %lds\n", (lEndStampTimes - lBeginStampTimes));
 
     return 0;
 }
-
-

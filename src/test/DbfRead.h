@@ -18,14 +18,41 @@
 #include <string>
 #include <vector>
 
+/**< DBF文件头结构 */
+/* -- 不是32位机器不要这样用
+typedef struct stDBFHead
+{
+    char Mark;          // 版本信息
+    unsigned char Year; //  + 1900
+    unsigned char Month;
+    unsigned char Day;
+    long RecCount;              // 4字节保存记录数
+    unsigned short DataOffset;  // 2字节保存文件头字节数
+    unsigned short RecSize;     // 2字节保存每行数据的长度
+    char Reserved[20];
+} stDbfHead, *LPDBFHEAD;
+*/
+
+typedef struct stDBFHead
+{
+    char szMark[1];          // 版本信息
+    char szYear[1];
+    char szMonth[1];
+    char szDay[1];
+    char szRecCount[4];    // 4字节保存记录数
+    char szDataOffset[2];  // 2字节保存文件头字节数
+    char szRecSize[2];     // 2字节保存每行数据的长度
+    char Reserved[20];
+} stDbfHead, *LPDBFHEAD;
+
 // dbf文件中存储的字段信息
 typedef struct stFieldHead
 {
     char szName[11];        // 0  - 10  字段名称
     char szType[1];         // 11       字段的数据类型，C字符、N数字、D日期、B二进制、等
-    char szResv[4];         // 12 - 15  保留字节, 默认为0
+    char szOffset[4];         // 12 - 15  字段偏移量, 默认为0
     char szLen[1];          // 16       字段长度
-    char szJingDu[1];       // 17       字段精度
+    char szPrecision[1];    // 17       字段精度
     char szResv2[2];        // 18 - 19  保留字节, 默认为0
     char szId[1];           // 20       工作区ID
     char szResv3[11];       // 21 - 31  保留字节, 默认为0
@@ -36,6 +63,7 @@ typedef void (*pCallback)(std::vector<stFieldHead> vecFieldHead, char *pcszConte
 class CDbfRead
 {
   public:
+    CDbfRead(){};
     CDbfRead(const std::string &strFile);
     ~CDbfRead(void);
 
@@ -47,13 +75,30 @@ class CDbfRead
      */
     int ReadHead();
 
+
     /*
      * @brief:  读入dbf文件, 并进行文件内存映射, 读取每行数据记录给pfn处理
-     * @param:  pfn         函数指针 
-     * @param:  nPageNum    申请12800个页的内存大小; 12800 * 4k = 500M    
+     * @param:  pfn         函数指针
+     * @param:  nPageNum    申请12800个页的内存大小; 12800 * 4k = 500M
      * @return:
      */
     int Read(pCallback pfn, int nPageNum = 128000);
+
+
+    /*
+     * @brief	: 生成dbf文件
+     * @param	: vecFieldHead 字段定义vec
+     * @return	: errcode
+     */
+    int AddHead(std::vector<stFieldHead> vecFieldHead);
+
+    /*
+     * @brief	: 插入记录
+     * @param	:
+     * @return	:
+     */
+    int AppendRec();
+
 
     int GetRecordNum()
     {

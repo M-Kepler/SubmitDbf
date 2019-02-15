@@ -318,3 +318,78 @@ int CDbfRead::ReadNoMmap(pCallback pfn)
     file.close();
     return 0;
 }
+
+
+
+
+int CDbfRead::AddHead(std::vector<stFieldHead> vecField)
+{
+    time_t now;
+    FILE *newDbf;
+    stDbfHead dbfHead;
+    int iFieldCnt = 0; // 确定文件头大小需要知道字段数
+    short offset = 0;
+    short recsize = 0;
+    char chFieldEndFlag = 0x0d; // 字段定义终止标志
+    char chFileEndFlag = 0x1A;  // 文件结束标志
+
+    time(&now);
+    tm *tp = localtime(&now);
+
+    iFieldCnt = vecField.size();
+    offset = (short)(sizeof(stDbfHead) + (iFieldCnt * sizeof(stFieldHead)) + 1);
+
+    for (auto x : vecField)
+    {
+        recsize += x.szLen[0];
+    }
+
+    // 初始化文件头
+    memset(&dbfHead, 0x00, sizeof(stDbfHead));
+    dbfHead.szMark[0] = 0x03;
+    memmove(&dbfHead.szYear, &tp->tm_year, sizeof(dbfHead.szYear));
+    memmove(&dbfHead.szMonth, &tp->tm_mon, sizeof(dbfHead.szMonth));
+    memmove(&dbfHead.szDay, &tp->tm_mday, sizeof(dbfHead.szDay));
+    memmove(&dbfHead.szDataOffset, &offset, sizeof(dbfHead.szDataOffset));
+    memmove(&dbfHead.szRecSize, &recsize, sizeof(dbfHead.szRecSize));
+
+    newDbf = fopen("./data.dbf", "wb");
+    // 写文件头
+    if (fwrite(&dbfHead, sizeof(dbfHead), 1, newDbf) < 1)
+    {
+        fclose(newDbf);
+        newDbf = NULL;
+        return -2;
+    }
+
+    // 写字段
+    for (unsigned i = 0; i < iFieldCnt; ++i)
+    {
+        if (fwrite(&vecField[i], sizeof(stFieldHead), 1, newDbf) < 1)
+        {
+            fclose(newDbf);
+            newDbf = NULL;
+            return -2;
+        }
+    }
+
+    // 加上字段定义结束标记
+    if (fwrite(&chFieldEndFlag, 1, 1, newDbf) < 1)
+    {
+        fclose(newDbf);
+        newDbf = NULL;
+        return -2;
+    }
+
+    // 加上文件结束标记
+    if (fwrite(&chFileEndFlag, 1, 1, newDbf) < 1)
+    {
+        fclose(newDbf);
+        newDbf = NULL;
+        return -2;
+    }
+
+    fclose(newDbf);
+    newDbf = NULL;
+    return 0;
+}

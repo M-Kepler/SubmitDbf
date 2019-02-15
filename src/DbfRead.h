@@ -18,6 +18,19 @@
 #include <string>
 #include <vector>
 
+// dbf文件文件头信息
+typedef struct stDBFHead
+{
+    char szMark[1];          // 版本信息
+    char szYear[1];
+    char szMonth[1];
+    char szDay[1];
+    char szRecCount[4];    // 4字节保存记录数
+    char szDataOffset[2];  // 2字节保存文件头字节数
+    char szRecSize[2];     // 2字节保存每行数据的长度
+    char Reserved[20];
+} stDbfHead, *LPDBFHEAD;
+
 // dbf文件中存储的字段信息
 typedef struct stFieldHead
 {
@@ -50,8 +63,8 @@ class CDbfRead
     /*
      * @brief:  读入dbf文件, 并进行文件内存映射, 读取每行数据记录给pfn处理
      *          耗时: 184s
-     * @param:  pfn         函数指针 
-     * @param:  nPageNum    申请12800个页的内存大小; 12800 * 4k = 500M    
+     * @param:  pfn         函数指针
+     * @param:  nPageNum    申请12800个页的内存大小; 12800 * 4k = 500M
      * @return:
      */
     int Read(pCallback pfn, int nPageNum = 128000);
@@ -59,18 +72,27 @@ class CDbfRead
     /*
      * @brief	: 上面的接口以每次500m来映射, 该接口一次全部映射完
      *            耗时: 217s
-     * @param	: 
-     * @return	: 
+     * @param	:
+     * @return	:
      */
     int ReadMmapOnce(pCallback pfn, int nPageNum = 128000);
 
     /*
      * @brief	: 不适用映射, 单纯地用fstream去读文件
      *            耗时: 554s
-     * @param	: 
-     * @return	: 
+     * @param	:
+     * @return	:
      */
     int ReadNoMmap(pCallback pfn);
+
+
+    /*
+     * @brief	: 生成dbf文件
+     * @param	: vecFieldHead 字段定义vec
+     * @return	: errcode
+     */
+    int AddHead(std::vector<stFieldHead> vecFieldHead);
+
 
     int GetRecordNum()
     {
