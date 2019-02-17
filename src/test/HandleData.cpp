@@ -586,6 +586,10 @@ void SetDate(unsigned char* date)
 int Csv2DbfCommand(string strFilePath)
 {
     int iRetCode;
+    int iTmp;
+    int iOffset = 1;
+    string strTmp;
+    stFieldHead stFieldTmp;
     vector<string> vecDbfColumns;
     std::vector<stFieldHead> vecFieldHead;
 
@@ -599,54 +603,58 @@ int Csv2DbfCommand(string strFilePath)
     // 解析配置中的字段属性组装成 stFieldHead 结构体
     for (auto x : vecDbfColumns)
     {
-        string strTmp;
-        stFieldHead stFieldTmp;
-        memset(&stFieldTmp, 0x00, sizeof(stFieldHead));
-        if (x.find("NAME") != string::npos)
+        memset(&stFieldTmp, 0, sizeof(struct stFieldHead));
+        if (x.find("NAME:") != string::npos)
         {
-            strTmp =  GetMsgValue(x, "NAME",",");
-            memcpy(stFieldTmp.szName,strTmp.c_str(),strTmp.length());
+            strTmp = GetMsgValue(x, "NAME", ",");
+            memcpy(stFieldTmp.szName, strTmp.c_str(), strTmp.length());
         }
-        if (x.find("TYPE") != string::npos)
+        if (x.find("TYPE:") != string::npos)
         {
-            strTmp =  GetMsgValue(x, "TYPE",",");
-            memcpy(stFieldTmp.szType,strTmp.c_str(),strTmp.length());
+            strTmp = GetMsgValue(x, "TYPE", ",");
+            memcpy(stFieldTmp.szType, strTmp.c_str(), strTmp.length());
         }
-        if (x.find("OFFSET") != string::npos)
+        if (x.find("OFFSET:") != string::npos)
         {
-            strTmp =  GetMsgValue(x, "OFFSET",",");
-            memcpy(stFieldTmp.szOffset,strTmp.c_str(),strTmp.length());
+            strTmp = GetMsgValue(x, "OFFSET", ",");
+            memcpy(stFieldTmp.szOffset, &strTmp, sizeof(stFieldTmp.szOffset));
         }
-        if (x.find("LEN") != string::npos)
+        if (x.find("LEN:") != string::npos)
         {
-            int iTmp =  atoi(GetMsgValue(x, "LEN",",").c_str());
-            memcpy(stFieldTmp.szLen, &iTmp,strTmp.length());
+            iTmp = atoi(GetMsgValue(x, "LEN", ",").c_str());
+            memcpy(stFieldTmp.szLen, &iTmp, sizeof(stFieldTmp.szLen));
+            memcpy(stFieldTmp.szOffset, &iOffset, sizeof(stFieldTmp.szOffset));
+            iOffset += iTmp;
         }
-        if (x.find("PRECISION") != string::npos)
+        if (x.find("PRECISION:") != string::npos)
         {
-            strTmp =  GetMsgValue(x, "PRECISION",",");
-            memcpy(stFieldTmp.szPrecision,strTmp.c_str(),strTmp.length());
+            iTmp = atoi(GetMsgValue(x, "PRECISION", ",").c_str());
+            memcpy(stFieldTmp.szPrecision, &iTmp, strTmp.length());
         }
-        if (x.find("RESV2") != string::npos)
+        if (x.find("RESV2:") != string::npos)
         {
             strTmp =  GetMsgValue(x, "RESV2",",");
-            memcpy(stFieldTmp.szResv2,strTmp.c_str(),strTmp.length());
+            memcpy(stFieldTmp.szResv2, strTmp.c_str(), strTmp.length());
         }
-        if (x.find("ID") != string::npos)
+        if (x.find("ID:") != string::npos)
         {
             strTmp =  GetMsgValue(x, "ID",",");
-            memcpy(stFieldTmp.szId,strTmp.c_str(),strTmp.length());
+            memcpy(stFieldTmp.szId, strTmp.c_str(), strTmp.length());
         }
-        if (x.find("RESV3") != string::npos)
+        if (x.find("RESV3:") != string::npos)
         {
             strTmp =  GetMsgValue(x, "RESV3",",");
-            memcpy(stFieldTmp.szResv3,strTmp.c_str(),strTmp.length());
+            memcpy(stFieldTmp.szResv3, strTmp.c_str(), strTmp.length());
         }
         vecFieldHead.push_back(stFieldTmp);
     }
 
     CDbfRead dbf;
     dbf.AddHead(vecFieldHead);
+    string s1[5] = {"1", "Ric G", "210.123456789123456", "43", "T"};
+    string s2[5] = {"1000", "Paul F", "196.2", "33", "T"};
+    dbf.AppendRec(s1);
+    dbf.AppendRec(s2);
 
     return 0;
 }

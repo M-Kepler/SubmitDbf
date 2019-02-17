@@ -17,6 +17,8 @@
 #include <stdio.h>
 #include <string>
 #include <vector>
+#include <iostream>
+using namespace std;
 
 // dbf文件文件头信息
 typedef struct stDBFHead
@@ -111,10 +113,13 @@ class CDbfRead
 
   private:
     std::string m_strFile;
+    FILE *m_newDbf;
+    char *m_pRecord;
 
     int m_nRecordNum;                           // dbf二进制文件中的记录条数
     short m_sFileHeadBytesNum;                  // dbf二进制文件的文件头中字节数
     short m_sRecordSize;                        // 一条记录中的字节长度, 每行数据所占长度
+    stDbfHead m_stDbfHead;
     std::vector<stFieldHead> m_vecFieldHead;    // 从dbf文件头中解析出的每个字段信息
 };
 

@@ -1,5 +1,5 @@
 
-all: mainmmapmulti.out 
+all: mainmmapmulti.out
 
 base.out: $^
 	g++ --std=c++11 -g -c  inifile.cpp -o inifile.o
@@ -8,7 +8,7 @@ base.out: $^
 
 mainmmapmulti.out : base.out DbfReadMmapMulti.cpp
 	g++ --std=c++11 -g -c DbfReadMmapMulti.cpp -o DbfReadMmapMulti.o
-	g++ --std=c++11 -g  inifile.o DbfReadMmapMulti.o HandleData.o -o mainmmapmulti.out
+	g++ --std=c++11 -g  inifile.o DbfReadMmapMulti.o HandleData.o -o HandleData.out
 
 clean:
 	rm -rf *.o *.out

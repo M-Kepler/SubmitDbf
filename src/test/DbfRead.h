@@ -17,6 +17,9 @@
 #include <stdio.h>
 #include <string>
 #include <vector>
+#include <iostream>
+#include <sstream>
+using namespace std;
 
 /**< DBF文件头结构 */
 /* -- 不是32位机器不要这样用
@@ -33,6 +36,7 @@ typedef struct stDBFHead
 } stDbfHead, *LPDBFHEAD;
 */
 
+// FIXME  用字符数组操作起来确实不怎么方便, 如果用int short的话又不能保证64位机器运行正确
 typedef struct stDBFHead
 {
     char szMark[1];          // 版本信息
@@ -59,6 +63,9 @@ typedef struct stFieldHead
 } stFieldHead;
 
 typedef void (*pCallback)(std::vector<stFieldHead> vecFieldHead, char *pcszContent);
+typedef unsigned char uint8;
+typedef short int uint16;
+typedef int uint32;
 
 class CDbfRead
 {
@@ -97,8 +104,8 @@ class CDbfRead
      * @param	:
      * @return	:
      */
-    int AppendRec();
-
+    int AppendRec(std::string *sValues);
+    int updateFileHeader();
 
     int GetRecordNum()
     {
@@ -118,9 +125,12 @@ class CDbfRead
   private:
     std::string m_strFile;
 
+    FILE *m_newDbf;
+    char *m_pRecord;
     int m_nRecordNum;                           // dbf二进制文件中的记录条数
     short m_sFileHeadBytesNum;                  // dbf二进制文件的文件头中字节数
     short m_sRecordSize;                        // 一条记录中的字节长度, 每行数据所占长度
+    stDbfHead m_stDbfHead;
     std::vector<stFieldHead> m_vecFieldHead;    // 从dbf文件头中解析出的每个字段信息
 };
 

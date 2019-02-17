@@ -21,6 +21,11 @@ CDbfRead::CDbfRead(const std::string &strFile)
 
 CDbfRead::~CDbfRead(void)
 {
+    if (m_newDbf != NULL)
+        fclose(m_newDbf);
+    m_newDbf = NULL;
+    delete m_pRecord;
+    m_pRecord = NULL;
 }
 
 int CDbfRead::ReadHead()
@@ -95,13 +100,14 @@ int CDbfRead::ReadHead()
 int CDbfRead::AddHead(std::vector<stFieldHead> vecField)
 {
     time_t now;
-    FILE *newDbf;
     stDbfHead dbfHead;
     int iFieldCnt = 0; // 确定文件头大小需要知道字段数
     short offset = 0;
     short recsize = 0;
     char chFieldEndFlag = 0x0d; // 字段定义终止标志
     char chFileEndFlag = 0x1A;  // 文件结束标志
+
+    m_vecFieldHead = vecField;
 
     time(&now);
     tm *tp = localtime(&now);
@@ -113,6 +119,7 @@ int CDbfRead::AddHead(std::vector<stFieldHead> vecField)
     {
         recsize += x.szLen[0];
     }
+    recsize += 1; // 记录长度+1, 保存记录的删除标记
 
     // 初始化文件头
     memset(&dbfHead, 0x00, sizeof(stDbfHead));
@@ -123,44 +130,173 @@ int CDbfRead::AddHead(std::vector<stFieldHead> vecField)
     memmove(&dbfHead.szDataOffset, &offset, sizeof(dbfHead.szDataOffset));
     memmove(&dbfHead.szRecSize, &recsize, sizeof(dbfHead.szRecSize));
 
-    newDbf = fopen("./data.dbf", "wb");
+    m_newDbf = fopen("./data.dbf", "wb");
     // 写文件头
-    if (fwrite(&dbfHead, sizeof(dbfHead), 1, newDbf) < 1)
+    if (fwrite(&dbfHead, sizeof(dbfHead), 1, m_newDbf) < 1)
     {
-        fclose(newDbf);
-        newDbf = NULL;
+        fclose(m_newDbf);
+        m_newDbf = NULL;
         return -2;
     }
 
     // 写字段
     for (unsigned i = 0; i < iFieldCnt; ++i)
     {
-        if (fwrite(&vecField[i], sizeof(stFieldHead), 1, newDbf) < 1)
+        if (fwrite(&vecField[i], sizeof(stFieldHead), 1, m_newDbf) < 1)
         {
-            fclose(newDbf);
-            newDbf = NULL;
+            fclose(m_newDbf);
+            m_newDbf = NULL;
             return -2;
         }
     }
 
     // 加上字段定义结束标记
-    if (fwrite(&chFieldEndFlag, 1, 1, newDbf) < 1)
+    if (fwrite(&chFieldEndFlag, 1, 1, m_newDbf) < 1)
     {
-        fclose(newDbf);
-        newDbf = NULL;
+        fclose(m_newDbf);
+        m_newDbf = NULL;
         return -2;
     }
 
     // 加上文件结束标记
-    if (fwrite(&chFileEndFlag, 1, 1, newDbf) < 1)
+    if (fwrite(&chFileEndFlag, 1, 1, m_newDbf) < 1)
     {
-        fclose(newDbf);
-        newDbf = NULL;
+        fclose(m_newDbf);
+        m_newDbf = NULL;
         return -2;
     }
+    fflush(m_newDbf);
+    // fclose(m_newDbf); // 先别close, 还要addfield呢
+    // m_newDbf = NULL;
 
-    fclose(newDbf);
-    newDbf = NULL;
+    m_stDbfHead = dbfHead;
+
+
+
+    return 0;
+}
+
+int CDbfRead::updateFileHeader()
+{
+    int iRes = fseek(m_newDbf,0,SEEK_SET);
+    if( iRes != 0)
+        return 1;
+
+    // 更新时间
+    time_t now;
+    time(&now);
+    tm *tp = localtime(&now);
+
+    // 初始化文件头
+    memmove(&m_stDbfHead.szYear, &tp->tm_year, sizeof(m_stDbfHead.szYear));
+    memmove(&m_stDbfHead.szMonth, &tp->tm_mon, sizeof(m_stDbfHead.szMonth));
+    memmove(&m_stDbfHead.szDay, &tp->tm_mday, sizeof(m_stDbfHead.szDay));
+
+    int iBytesWritten = fwrite(&m_stDbfHead, 1, sizeof(m_stDbfHead), m_newDbf);
+    if( iBytesWritten != sizeof(m_stDbfHead))
+    {
+        std::cerr << __FUNCTION__ << " Failed to update header!" << std::endl;
+        return 1;
+    }
+    return 0;
+}
+
+
+int CDbfRead::AppendRec(std::string *sValues)
+{
+
+    int iRecCount;
+    int iOffset;
+    short iRecSize;
+    uint8_t iLen;
+    char chFileEndFlag = 0x1A;  // 文件结束标志
+    // TODO 处理csv文件不够字段数的情况
+
+    // FIXME char[4] 转 int // 刚开始先用atoi, 但是有问题, 后来改用memcpy, 长度又有问题, 不能把ch[1]拷贝到int, 长度不对，应该只拷贝1
+
+    // 计算插入记录的位置: 文件头定义 + 字段定义 + 记录长度 + 1标记
+    memcpy(&iRecSize, m_stDbfHead.szRecSize, sizeof(m_stDbfHead.szRecSize));
+    memcpy(&iRecCount, m_stDbfHead.szRecCount, sizeof(m_stDbfHead.szRecCount));
+    int iRecPos = sizeof(stDbfHead) + m_vecFieldHead.size() * sizeof(stFieldHead) + iRecSize * iRecCount + 1;
+    int iRes = fseek(m_newDbf, iRecPos, SEEK_SET);
+    if (iRes != 0 )
+    {
+        std::cerr << __FUNCTION__ << " Error seeking to new Record position " << std::endl;
+        return 1;
+    }
+
+    // 初始化指针
+    m_pRecord = (char *)malloc(sizeof(char) * iRecSize);
+    memset(m_pRecord, 0, sizeof(char) * iRecSize);
+    m_pRecord[0] = ' '; // 首字节作为是否删除的标记
+
+    for (int f = 0; f < m_vecFieldHead.size(); f++)
+    {
+        std::string sFieldValue = sValues[f];
+        char cType = m_vecFieldHead[f].szType[0];
+        memcpy(&iLen, m_vecFieldHead[f].szLen, 1);
+        memcpy(&iOffset, m_vecFieldHead[f].szOffset, sizeof(m_vecFieldHead[f].szOffset));
+        if( cType == 'I' )
+        {
+            auto iTmp = atoi(sFieldValue.c_str());
+            memcpy(&m_pRecord[iOffset], &iTmp, sizeof(iTmp));
+        }
+        else if( cType== 'B' )
+        {
+            auto iTmp = atof(sFieldValue.c_str());
+            memcpy(&m_pRecord[iOffset], &iTmp, sizeof(iTmp));
+        }
+        else if( cType== 'L' )
+        {
+            // logical
+            if (sFieldValue == "T" || sFieldValue == "TRUE")
+                m_pRecord[iOffset] = 'T';
+            else if( sFieldValue=="?")
+                m_pRecord[iOffset] = '?';
+            else
+                m_pRecord[iOffset] = 'F';
+        }
+        else
+        {
+            // default for character type fields (and all unhandled field types)
+            for (unsigned int j = 0; j < iLen; j++)
+            {
+                int n = iOffset + j;
+                if( j < sFieldValue.length() )
+                    m_pRecord[n] = sFieldValue[j];
+                else
+                    m_pRecord[n] = 0;
+            }
+        }
+    }
+
+    // write the record at the end of the file
+    // FIXME
+    int nBytesWritten = fwrite(m_pRecord, 1, iRecSize, m_newDbf);
+    if( nBytesWritten != iRecSize)
+    {
+        std::cerr << __FUNCTION__ << " Failed to write new record ! wrote " << nBytesWritten << " bytes but wanted to write " << iRecSize << " bytes" << std::endl;
+        return 1;
+    }
+
+    int iNewRecCount = iRecCount + 1;
+    time_t now;
+    time(&now);
+    tm *tp = localtime(&now);
+    memcpy(m_stDbfHead.szRecCount, &iNewRecCount, sizeof(m_stDbfHead.szRecCount));
+    memmove(m_stDbfHead.szYear, &tp->tm_year, sizeof(m_stDbfHead.szYear));
+    memmove(m_stDbfHead.szMonth, &tp->tm_mon, sizeof(m_stDbfHead.szMonth));
+    memmove(m_stDbfHead.szDay, &tp->tm_mday, sizeof(m_stDbfHead.szDay));
+
+    // 加上文件结束标记
+    if (fwrite(&chFileEndFlag, 1, 1, m_newDbf) < 1)
+    {
+        fclose(m_newDbf);
+        m_newDbf = NULL;
+        return -2;
+    }
+    // make sure change is made permanent, we are not looking for speed, just reliability and compatibility
+    fflush(m_newDbf);
     return 0;
 }
 
