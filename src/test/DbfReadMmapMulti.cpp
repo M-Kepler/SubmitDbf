@@ -124,7 +124,7 @@ int CDbfRead::AddHead(std::vector<stFieldHead> vecField)
 
     // 初始化文件头
     memset(&dbfHead, 0x00, sizeof(stDbfHead));
-    dbfHead.szMark[0] = 0x03;
+    dbfHead.szMark[0] = 0x30;
     memmove(&dbfHead.szYear, &tp->tm_year, sizeof(dbfHead.szYear));
     memmove(&dbfHead.szMonth, &tp->tm_mon, sizeof(dbfHead.szMonth));
     memmove(&dbfHead.szDay, &tp->tm_mday, sizeof(dbfHead.szDay));
@@ -167,8 +167,8 @@ int CDbfRead::AddHead(std::vector<stFieldHead> vecField)
         return -2;
     }
     fflush(m_newDbf);
-    fclose(m_newDbf); // 先别close, 还要addfield呢
-    m_newDbf = NULL;
+    // fclose(m_newDbf); // 先别close, 还要addfield呢
+    // m_newDbf = NULL;
 
     m_stDbfHead = dbfHead;
 
@@ -294,6 +294,7 @@ int CDbfRead::AppendRec(std::string *sValues)
         m_newDbf = NULL;
         return -2;
     }
+
     if (m_pRecord != NULL)
     {
         delete m_pRecord;
