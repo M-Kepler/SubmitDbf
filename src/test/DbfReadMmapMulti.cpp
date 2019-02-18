@@ -14,7 +14,8 @@
 CDbfRead::CDbfRead(const std::string &strFile)
     : m_nRecordNum(0),
       m_sFileHeadBytesNum(0),
-      m_sRecordSize(0)
+      m_sRecordSize(0),
+      m_newDbf(NULL)
 {
     m_strFile = strFile;
 }
@@ -22,10 +23,10 @@ CDbfRead::CDbfRead(const std::string &strFile)
 CDbfRead::~CDbfRead(void)
 {
     if (m_newDbf != NULL)
-        fclose(m_newDbf);
-    m_newDbf = NULL;
-    delete m_pRecord;
-    m_pRecord = NULL;
+    {
+        fclose(m_newDbf); // 有可能要连续append, 所以在析构的时候再close
+        m_newDbf = NULL;
+    }
 }
 
 int CDbfRead::ReadHead()
@@ -166,12 +167,10 @@ int CDbfRead::AddHead(std::vector<stFieldHead> vecField)
         return -2;
     }
     fflush(m_newDbf);
-    // fclose(m_newDbf); // 先别close, 还要addfield呢
-    // m_newDbf = NULL;
+    fclose(m_newDbf); // 先别close, 还要addfield呢
+    m_newDbf = NULL;
 
     m_stDbfHead = dbfHead;
-
-
 
     return 0;
 }
@@ -295,7 +294,12 @@ int CDbfRead::AppendRec(std::string *sValues)
         m_newDbf = NULL;
         return -2;
     }
-    // make sure change is made permanent, we are not looking for speed, just reliability and compatibility
+    if (m_pRecord != NULL)
+    {
+        delete m_pRecord;
+        m_pRecord = NULL;
+    }
+
     fflush(m_newDbf);
     return 0;
 }

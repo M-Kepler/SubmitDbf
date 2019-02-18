@@ -49,10 +49,6 @@ void trim(std::string &s)
 int GetConfigValue(string &strValue, string strKey, string strSection="CONFIG")
 {
     int iRetCode;
-    if (iRetCode != RET_OK)
-    {
-        return RET_ERR;
-    }
     iRetCode = ini.getValue(strSection, strKey, strValue);
     if (iRetCode != RET_OK)
     {
@@ -285,12 +281,14 @@ int ImportDB(vector<stFieldHead> vecFieldHead, string TableName, string FileName
 
     // TODO User, Pwd, Db替换成相应的值
     // 执行系统命令
+    /*j
     sprintf(Execommand, "sqlldr userid=%s/%s@%s control=%s", User, Pwd, DB, sqlload.c_str());
     if (system(execommand) == -1)
     {
         // SQL*Loader执行错误
         return -1;
     }
+    */
     return 0 ;
 }
 
@@ -456,7 +454,7 @@ int GeneraCommand(string strFilePath)
         || (GetConfigValue(strColumns, "Columns") != RET_OK)
     )
     {
-        printf("Get Config  Failed!\n");
+        printf("Get Config Failed!\n");
         abort();
     }
     DeleteAllFile(strSqlFileFolder.c_str());
@@ -477,6 +475,7 @@ int GeneraCommand(string strFilePath)
     dbf.Read(GenerateSql);
 
     fflush(pf);
+    fclose(pf);
     return 0;
 }
 
@@ -598,10 +597,10 @@ int RunSqlCommand()
 }
 
 // main函数命令 sqlldr
-int SqlLoadCommand()
+int SqlLoadCommand(string strFileName)
 {
     // TODO FileName为需要导入的文件
-    if (ImportDB(vecColumns, strTableName, string FileName) < 0)
+    if (ImportDB(vecColumns, strTableName, strFileName) < 0)
     {
         printf("Load File Faile");
         abort();
@@ -721,7 +720,7 @@ int main(int argc, char *argv[])
 
     if (strcmp(argv[1], "sqlldr") == 0)
     {
-        iRetCode = SqlLoadCommand();
+        iRetCode = SqlLoadCommand(argv[2]);
         if (iRetCode != 0)
         {
             printf("\n SqlLoader Error" );
@@ -730,7 +729,7 @@ int main(int argc, char *argv[])
 
     if (strcmp(argv[1], "2dbf") == 0)
     {
-        iRetCode = Csv2DbfCommand();
+        iRetCode = Csv2DbfCommand(argv[2]);
         if (iRetCode != 0)
         {
             printf("\n SqlLoader Error" );

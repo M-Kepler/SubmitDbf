@@ -17,7 +17,9 @@ using namespace std;
 CDbfRead::CDbfRead(const std::string &strFile)
     : m_nRecordNum(0),
       m_sFileHeadBytesNum(0),
-      m_sRecordSize(0)
+      m_sRecordSize(0),
+      m_newDbf(NULL),
+      m_pRecord(NULL)
 {
     m_strFile = strFile;
 }
@@ -25,10 +27,10 @@ CDbfRead::CDbfRead(const std::string &strFile)
 CDbfRead::~CDbfRead(void)
 {
     if (m_newDbf != NULL)
-        fclose(m_newDbf);
-    m_newDbf = NULL;
-    delete m_pRecord;
-    m_pRecord = NULL;
+    {
+        fclose(m_newDbf); // 有可能要连续appendrec, 所以在析构的时候再close文件
+        m_newDbf = NULL;
+    }
 }
 
 int CDbfRead::ReadHead()
@@ -500,6 +502,11 @@ int CDbfRead::AppendRec(std::string *sValues)
     }
     // make sure change is made permanent, we are not looking for speed, just reliability and compatibility
     fflush(m_newDbf);
+    if (m_pRecord != NULL)
+    {
+        delete m_pRecord;
+        m_pRecord = NULL;
+    }
     return 0;
 }
 

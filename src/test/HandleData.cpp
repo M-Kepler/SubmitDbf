@@ -568,6 +568,7 @@ int GeneraCommand(string strFilePath)
     // dbf.Read(ReadDbf);
 
     fflush(pf);
+    fclose(pf);
     return 0;
 }
 
@@ -869,10 +870,6 @@ int main(int argc, char *argv[])
     }
     if (strcmp(argv[1], "sqlldr") == 0)
     {
-        if (GeneraCommand(argv[2]) != 0)
-        {
-            printf("Error while generate sql file");
-        }
         if (ImportDB(vecColumns, "tmp_data_check_rst", "data.dat", ",", "\""))
         {
             printf("Error while generate sql control file");

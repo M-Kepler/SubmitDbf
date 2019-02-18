@@ -38,9 +38,9 @@ typedef struct stFieldHead
 {
     char szName[11];        // 0  - 10  字段名称
     char szType[1];         // 11       字段的数据类型，C字符、N数字、D日期、B二进制、等
-    char szResv[4];         // 12 - 15  保留字节, 默认为0
+    char szOffset[4];         // 12 - 15  字段偏移量, 默认为0
     char szLen[1];          // 16       字段长度
-    char szJingDu[1];       // 17       字段精度
+    char szPrecision[1];    // 17       字段精度
     char szResv2[2];        // 18 - 19  保留字节, 默认为0
     char szId[1];           // 20       工作区ID
     char szResv3[11];       // 21 - 31  保留字节, 默认为0
@@ -51,6 +51,7 @@ typedef void (*pCallback)(std::vector<stFieldHead> vecFieldHead, char *pcszConte
 class CDbfRead
 {
   public:
+    CDbfRead(){};
     CDbfRead(const std::string &strFile);
     ~CDbfRead(void);
 
@@ -95,6 +96,12 @@ class CDbfRead
      */
     int AddHead(std::vector<stFieldHead> vecFieldHead);
 
+    /*
+     * @brief	: 插入记录
+     * @param	:
+     * @return	:
+     */
+    int AppendRec(std::string *sValues);
 
     int GetRecordNum()
     {
