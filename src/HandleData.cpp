@@ -12,8 +12,13 @@
 #include "DbfRead.h"
 #include "inifile.h"
 
+/* {{{{{{{{不用libcommondao.so}}}}}}}
+// 源文件备份在doc/目录下
 #include "dao_base.h"
 #include "dao_dynamicsql.h"
+CDAOBase g_oDaoBaseHandler;
+CDAODynamicSql g_oDaoDynamicSqlHandler;
+*/
 
 using namespace inifile;
 
@@ -33,8 +38,6 @@ string strSqlFileFolder;
 
 typedef void (*pLineCallback)(int iCnt, const char *pcszContent);
 
-CDAOBase g_oDaoBaseHandler;
-CDAODynamicSql g_oDaoDynamicSqlHandler;
 
 
 void trim(std::string &s)
@@ -256,10 +259,10 @@ int ImportDB(vector<stFieldHead> vecFieldHead, string TableName, string FileName
         return -1 ;
     }
     fprintf(fctl, "LOAD DATA\n");
-    fprintf(fctl, "INFILE '%s'\n", FileName.c_str());
-    fprintf(fctl, "APPEND INTO TABLE %s\n", TableName.c_str());
-    fprintf(fctl, "FIELDS TERMINATED BY \"%s\"\n", strTok.c_str());
-    fprintf(fctl, "Optionally enclosed by '%s'\n", strSplit.c_str()); // 不能用大写
+    fprintf(fctl, "INFILE '%s'\n", FileName.c_str());           // 文件名
+    fprintf(fctl, "APPEND INTO TABLE %s\n", TableName.c_str()); // 表名
+    fprintf(fctl, "FIELDS TERMINATED BY \"%s\"\n", strTok.c_str());   // 数据分隔符
+    fprintf(fctl, "Optionally enclosed by '%s'\n", strSplit.c_str()); // 字段包围符
     fprintf(fctl, "TRAILING NULLCOLS\n");
     fprintf(fctl, "(\n");
 
@@ -281,7 +284,7 @@ int ImportDB(vector<stFieldHead> vecFieldHead, string TableName, string FileName
 
     // TODO User, Pwd, Db替换成相应的值
     // 执行系统命令
-    /*j
+    /*
     sprintf(Execommand, "sqlldr userid=%s/%s@%s control=%s", User, Pwd, DB, sqlload.c_str());
     if (system(execommand) == -1)
     {
@@ -295,7 +298,8 @@ int ImportDB(vector<stFieldHead> vecFieldHead, string TableName, string FileName
 
 
 // 连接数据库
-// TODO 加密 肯定不能明文放在配置文件啊
+// 加密 肯定不能明文放在配置文件啊
+/* {{{{{{{{不用libcommondao.so}}}}}}}
 int ConnectOracle(void)
 {
     string strDbName;
@@ -311,9 +315,11 @@ int ConnectOracle(void)
     int ret = g_oDaoBaseHandler.Connect(strDbUserName.c_str(), strDbPwd.c_str(), strDbName.c_str());
     return ret;
 }
+*/
 
 
 // 执行sql语句
+/* {{{{{{{{不用libcommondao.so}}}}}}}
 void SqlCommit(int iCommitCnt, const char* pcszSql)
 {
     int iRetCode;
@@ -338,6 +344,7 @@ void SqlCommit(int iCommitCnt, const char* pcszSql)
     }
 
 }
+*/
 
 // 读入strFile文件行交给pf函数处理
 void ReadFile(const std::string &strFile, int iCommitCnt, pLineCallback pf)
@@ -472,8 +479,8 @@ int GeneraCommand(string strFilePath)
     // 本打算根据dbf信息自动建表, 不太好, 因为多次执行的时候会冲突
     dbf.ReadHead();
 
-    dbf.Read(GenerateSql);
-
+    // dbf.Read(GenerateSql); // XXX 指定生成什么样的文件，如果用sqlldr就用 GenerateSqlLoader
+    dbf.Read(GenerateSqlLoader); // XXX 指定生成什么样的文件，如果用sqlldr就用 GenerateSqlLoader
     fflush(pf);
     fclose(pf);
     return 0;
@@ -482,6 +489,7 @@ int GeneraCommand(string strFilePath)
 
 
 // main函数命令 run
+/* {{{{{{{{不用libcommondao.so}}}}}}}
 int RunSqlCommand()
 {
     int iRetCode;
@@ -541,7 +549,7 @@ int RunSqlCommand()
         }
         g_nCommitCount = 0;
     }
-    */
+    *
     // end
 
     // TODO 多进程, 每个进程分别调用ReadFile处理一个文件
@@ -595,8 +603,11 @@ int RunSqlCommand()
     // fflush(fpInsert);
     return 0;
 }
+*/
+
 
 // main函数命令 sqlldr
+// 需要先修改代码，生成sqlldr的data文件
 int SqlLoadCommand(string strFileName)
 {
     // TODO FileName为需要导入的文件
@@ -676,6 +687,7 @@ int Csv2DbfCommand(string strFilePath)
 
     CDbfRead dbf;
     dbf.AddHead(vecFieldHead);
+    // TODO 解析文件，用appendrec加入dbf。这里只写了两个测试例子
     string s1[5] = {"1", "Ric G", "210.123456789123456", "43", "T"};
     string s2[5] = {"1000", "Paul F", "196.2", "33", "T"};
     dbf.AppendRec(s1);
@@ -691,12 +703,12 @@ int main(int argc, char *argv[])
     long lEndStampTimes;
     iRetCode = ini.load("./config.ini");
 
-    if (2 != argc && 3 != argc)
+    if (3 != argc)
     {
         printf("param error!\n");
-        printf("Generate SqlFile:\t[exec] gene [path/to/dbf]\n");
-        printf("Run SqlFile:\t[exec] run\n");
-        printf("Generate & Run:\t[exec] batch [path/to/dbf]\n");
+        printf("conver dbf to file:\t[exec] gene [path/to/dbf]\n");
+        printf("commit use sqlldr:\t[exec] sqlldr [path/to/datafile(gene first)]\n");
+        printf("conver csv to dbf:\t[exec] 2dbf [path/to/csv]\n");
         return -1;
     }
 
@@ -709,6 +721,7 @@ int main(int argc, char *argv[])
             printf("Error while generate sql file");
         }
     }
+    /* {{{{{{{{不用libcommondao.so}}}}}}}
     if (strcmp(argv[1], "run") == 0 || strcmp(argv[1], "batch") == 0)
     {
         iRetCode = RunSqlCommand();
@@ -717,6 +730,7 @@ int main(int argc, char *argv[])
             printf("\nError while run sql, errorcode:%d", iRetCode);
         }
     }
+    */
 
     if (strcmp(argv[1], "sqlldr") == 0)
     {
@@ -729,6 +743,7 @@ int main(int argc, char *argv[])
 
     if (strcmp(argv[1], "2dbf") == 0)
     {
+        // 兼容csv文件有的不用冒号括起来的
         iRetCode = Csv2DbfCommand(argv[2]);
         if (iRetCode != 0)
         {
@@ -742,5 +757,3 @@ int main(int argc, char *argv[])
 
     return 0;
 }
-
-

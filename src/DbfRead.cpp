@@ -354,13 +354,14 @@ int CDbfRead::AddHead(std::vector<stFieldHead> vecField)
 
     // 初始化文件头
     memset(&dbfHead, 0x00, sizeof(stDbfHead));
-    dbfHead.szMark[0] = 0x03;
+    dbfHead.szMark[0] = 0x30;
     memmove(&dbfHead.szYear, &tp->tm_year, sizeof(dbfHead.szYear));
     memmove(&dbfHead.szMonth, &tp->tm_mon, sizeof(dbfHead.szMonth));
     memmove(&dbfHead.szDay, &tp->tm_mday, sizeof(dbfHead.szDay));
     memmove(&dbfHead.szDataOffset, &offset, sizeof(dbfHead.szDataOffset));
     memmove(&dbfHead.szRecSize, &recsize, sizeof(dbfHead.szRecSize));
 
+    // TODO 这个文件名最好使用filename
     m_newDbf = fopen("./data.dbf", "wb");
     // 写文件头
     if (fwrite(&dbfHead, sizeof(dbfHead), 1, m_newDbf) < 1)

@@ -1,0 +1,40 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(gdb)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "main.out",
+            "args": [ ],
+            "stopAtEntry": false,
+            "cwd": "/mnt/f/workspace/dbf_to_oracle/src",
+            "environment": [],
+            "externalConsole": true,
+            "sourceFileMap": {
+                // "/mnt/c/Users/M-Kepler/source/repos/parse_log/parse_log" :"${workspaceFolder}/parse_log"
+            },
+            "windows": {
+                "MIMode": "gdb",
+                "setupCommands": [
+                    {
+                        "description": "Enable pretty-printing for gdb",
+                        "text": "-enable-pretty-printing",
+                        "ignoreFailures": true
+                    }
+                ]
+            },
+            "pipeTransport": {
+                "pipeCwd": "",
+                "pipeProgram": "c:\\Windows\\System32\\bash.exe",
+                "pipeArgs": [
+                    "-c"
+                ],
+                "debuggerPath": "/usr/bin/gdb"
+            }
+        }
+    ]
+}

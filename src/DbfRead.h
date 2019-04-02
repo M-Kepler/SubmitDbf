@@ -6,6 +6,7 @@
  * Filename     : dbf_read.h
  * Description  : 以二进制形式读入dbf文件
     * dbf文件的二进制文件格式:  http://www.xumenger.com/dbf-20160703/
+    * https://github.com/bramhe/DBFEngine
     * 编辑器中看到的的十六进制是: 9f17 对应的十进制应该是6047(即十六进制179f对应的十进制)
     * 之所以要从右往左读是因为内存中存储数据采用的是"小端模式",数据的低位存在前面，高位存在后面
  ****************************************************
@@ -81,7 +82,7 @@ class CDbfRead
     int ReadMmapOnce(pCallback pfn, int nPageNum = 128000);
 
     /*
-     * @brief	: 不适用映射, 单纯地用fstream去读文件
+     * @brief	: 不使用映射, 单纯地用fstream去读文件
      *            耗时: 554s
      * @param	:
      * @return	:

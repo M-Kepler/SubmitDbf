@@ -875,7 +875,7 @@ int main(int argc, char *argv[])
             printf("Error while generate sql control file");
         }
     }
-    // TODO csv转dbf
+    // csv转dbf
     if (strcmp(argv[1], "2dbf") == 0 )
     {
         if (Csv2DbfCommand(argv[2]) != 0)
