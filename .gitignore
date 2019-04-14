@@ -4,6 +4,5 @@
 /common/
 /dbf/qtzhzl*
 *.o
-*.out
 *.sqx
 /.vscode/ipch/*

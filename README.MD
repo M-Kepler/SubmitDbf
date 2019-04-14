@@ -1,14 +1,55 @@
-[TOC]
 
-## 说明
 
-* makefile
+<!-- TOC -->
 
-```
-GeneSql.cpp 和 HandleData.cpp 代码一样, 只是把与数据库相关的注释掉, 方便在没有oracle的环境下编译
-如果在有oracle的环境下, 要编译 HandleData.cpp, 要先把GeneSql.cpp 先备份到其他地方
-```
+- [说明](#说明)
+- [使用方法](#使用方法)
+    - [生成文件](#生成文件)
+- [其他](#其他)
+- [注意](#注意)
+- [任务清单](#任务清单)
+    - [DONE](#done)
+    - [TODO](#todo)
 
+<!-- /TOC -->
+
+
+# 说明
+
+
+# 使用方法
+
+* 配置 `config.ini`
+  
+
+## 生成文件
+
+dbf文件夹下有测试文件，自己可以试一下，生成文件没有加后缀  
+
+* 生成 sql 文件
+  ```
+  $ ./main.out dbf2sql /path/to/dbf
+  ```
+
+* dbf 转 csv文件   
+  ```
+  $ ./main.out dbf2csv /path/to/dbf
+  ```
+
+* csv 转 dbf   
+  生成文件为 `data.dbf`    
+  ```
+  $ ./main.out csv2dbf /path/to/csv
+  ```
+
+* 提交数据库
+  用了 `sqlldr`，程序自动生成`ctrl`文件，并指向`sqllr`命令   
+  ```
+  $ ./main.out sqlldr /path/to/data
+  ```
+
+
+# 其他 
 
 * DbfRead.cpp 提供了三个处理方法, 下面是速度比较:
 
@@ -37,28 +78,6 @@ GeneSql.cpp 和 HandleData.cpp 代码一样, 只是把与数据库相关的注�
 ```
 
 
-## 使用方法
-
-* 配置 config.ini
-
-* 仅生成sql文件
-
-```
-$ ./main.out gene /path/to/dbf
-```
-
-* 仅运行sql文件
-
-```
-$ ./main.out run
-```
-
-* 一步操作
-
-```
-$ ./main.out batch /path/to/dbf
-```
-
 
 # 注意
 
@@ -73,11 +92,6 @@ $ ./main.out batch /path/to/dbf
 
 ## DONE
 
-* 从dbf二进制文件中读取文件信息
-
-* 根据dbf文件头信息拆解文件, 根据配置信息组装sql语句
-
-* 插入oracle数据库
 
 
 ## TODO

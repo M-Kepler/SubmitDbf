@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include "DbfRead.h"
 #include "inifile.h"
+#include <fstream>
 
 /* {{{{{{{{不用libcommondao.so}}}}}}}
 // 源文件备份在doc/目录下
@@ -33,11 +34,13 @@ vector<stFieldHead> vecColumns; // 保存dbf的字段属性
 string strSqlFileCnt;
 string strTableName;
 string strColumns;
+string strIncAndSplit;
 string strMaxCommitCnt;
 string strSqlFileFolder;
+char *g_pIncAndSplit = (char*) strIncAndSplit.c_str();
 
 typedef void (*pLineCallback)(int iCnt, const char *pcszContent);
-
+typedef void (*pCallback)(std::vector<stFieldHead> vecFieldHead, char *pcszContent);
 
 
 void trim(std::string &s)
@@ -70,7 +73,7 @@ typedef struct stContent
 
 
 // 获取要生成的文件的文件名
-const char *GetFileName(void)
+const char *GetFileName( )
 {
     string strValue;
     char szFileName[10] = {0};
@@ -81,11 +84,10 @@ const char *GetFileName(void)
     }
 
     memset(szFileName, 0, sizeof(szFileName));
-    snprintf(szFileName, sizeof(szFileName), "/sql_%4.4d", fileNo);
+    // snprintf(szFileName, sizeof(szFileName), "/sql_%4.4d", fileNo);
 
-    // XXX 为什么我返回tmp.cstr() 就不行呢
-    // 如果g_strFile不是全局变量, 会报错
-    g_strFile = strValue + szFileName + ".sql";
+    // g_strFile = strValue + szFileName + ".sql";
+    g_strFile = strValue + "/" + strTableName;
     // return szFileName;
     return g_strFile.c_str();
 }
@@ -180,20 +182,25 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
     fprintf(pf, "%s\n", szSql);
 }
 
-
-
 /*
  * @brief	: 生成data文件, 以用sqlldr载入数据库
- * @param	:
+ *            可以自行更改字段用什么包括，字段之间用什么间隔
+ * @param	: char* pIncCPlit 表示包裹字符和分割字符
+ *            如果是 ", 则表示字段由""包裹, 字段间由,分隔
+ *            如果没有包裹，则写0：如：0,
  * @return	:
  */
-void GenerateSqlLoader(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
+void GenerateCsv(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
 {
     int iColumnLen = 0;
     char szSql[2048] = {0};
     char chBuff[2] = {0};
     char buffer[1024] = {0};
     char szTempBuff[128] = {0};
+
+    char chInclude = g_pIncAndSplit[0];
+    char chSplit = g_pIncAndSplit[1];
+
     string strTmp;
 
     for (int i = 0; i < vecFieldHead.size(); i++)
@@ -216,16 +223,20 @@ void GenerateSqlLoader(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
             {
                 strTmp  = "";
             }
-            strncat(szSql, "\"", 1);
+            if(chInclude != '0')
+                strncat(szSql, &chInclude, 1);
+                // strncat(szSql, "\"", 1);
             snprintf(szTempBuff, sizeof(szTempBuff), "%s", strTmp.c_str());
             strncat(szSql, szTempBuff, sizeof(szSql) - strlen(szSql) - 1);
             if (i < vecFieldHead.size() - 1)
             {
-                strncat(szSql, "\",", 2);
+                // strncat(szSql, "\",", 2);
+                strncat(szSql, g_pIncAndSplit, 2);
             }
             else
             {
-                strncat(szSql, "\"", 1);
+                // strncat(szSql, "\"", 1);
+                strncat(szSql, &chInclude, 1);
             }
         }
         pcszContent += iColumnLen; // 跳到下一个字段
@@ -452,13 +463,14 @@ string GetMsgValue(string strOrig, string strKey, string strSplit = ",")
 
 
 // main函数命令 gene
-int GeneraCommand(string strFilePath)
+int GeneraCommand(string strFilePath, pCallback handleFunc)
 {
     int iRetCode;
     if ((GetConfigValue(strSqlFileFolder, "SqlFileFolder") != RET_OK)
         || (GetConfigValue(strSqlFileCnt, "SqlFileCnt") != RET_OK)
         || (GetConfigValue(strTableName, "TableName") != RET_OK)
         || (GetConfigValue(strColumns, "Columns") != RET_OK)
+        || (GetConfigValue(strIncAndSplit, "IncAndSplit") != RET_OK)
     )
     {
         printf("Get Config Failed!\n");
@@ -479,8 +491,7 @@ int GeneraCommand(string strFilePath)
     // 本打算根据dbf信息自动建表, 不太好, 因为多次执行的时候会冲突
     dbf.ReadHead();
 
-    // dbf.Read(GenerateSql); // XXX 指定生成什么样的文件，如果用sqlldr就用 GenerateSqlLoader
-    dbf.Read(GenerateSqlLoader); // XXX 指定生成什么样的文件，如果用sqlldr就用 GenerateSqlLoader
+    dbf.Read(handleFunc);
     fflush(pf);
     fclose(pf);
     return 0;
@@ -610,7 +621,6 @@ int RunSqlCommand()
 // 需要先修改代码，生成sqlldr的data文件
 int SqlLoadCommand(string strFileName)
 {
-    // TODO FileName为需要导入的文件
     if (ImportDB(vecColumns, strTableName, strFileName) < 0)
     {
         printf("Load File Faile");
@@ -687,12 +697,47 @@ int Csv2DbfCommand(string strFilePath)
 
     CDbfRead dbf;
     dbf.AddHead(vecFieldHead);
-    // TODO 解析文件，用appendrec加入dbf。这里只写了两个测试例子
+
+    // 样例
+    /*
     string s1[5] = {"1", "Ric G", "210.123456789123456", "43", "T"};
     string s2[5] = {"1000", "Paul F", "196.2", "33", "T"};
     dbf.AppendRec(s1);
     dbf.AppendRec(s2);
+    // 测试案例的配置（放到config.ini 的DBF下）
+    FIELD=NAME:ID,TYPE:I,LEN:4
+    FIELD=NAME:FirstName,TYPE:C,LEN:20
+    FIELD=NAME:Weight,TYPE:F,LEN:12,PRECISION:2
+    FIELD=NAME:Age,TYPE:N,LEN:3
+    FIELD=NAME:Married,TYPE:L,LEN:1
+    */
 
+    fstream csv;
+    string buff;
+    int iColumns = vecDbfColumns.size();
+    int i = 0;
+    char* token;
+    const char* delim = ",";
+    string szstrTmp [iColumns];
+
+    csv.open(strFilePath.c_str(), ios::binary | ios::in);
+    if (!csv)
+        perror("open failed\n");
+
+    while(getline(csv, buff))
+    {
+        char *oristr = (char*)buff.c_str();
+        // char *oristr = strdup(buff.c_str()); // 坑
+
+        // 不能用strtok，不适合字段为空的情况: aaaaa,,bbbb
+        // for (token = strtok(const_cast<char*>(buff.c_str()), delim); token != NULL; token = strtok(NULL, delim))
+        for (token = strsep(&oristr, delim), i = 0; token != NULL, i < iColumns; token = strsep(&oristr, delim), i++)
+        {
+            szstrTmp[i] = token;
+        }
+        // free(oristr);
+        dbf.AppendRec(szstrTmp);
+    }
     return 0;
 }
 
@@ -714,23 +759,21 @@ int main(int argc, char *argv[])
 
     lBeginStampTimes = time(NULL);
 
-    if (strcmp(argv[1], "gene") == 0 || strcmp(argv[1], "batch") == 0)
+    if (strcmp(argv[1], "dbf2sql") == 0 )
     {
-        if (GeneraCommand(argv[2]) != 0)
+        if (GeneraCommand(argv[2], GenerateSql) != 0)
         {
             printf("Error while generate sql file");
         }
     }
-    /* {{{{{{{{不用libcommondao.so}}}}}}}
-    if (strcmp(argv[1], "run") == 0 || strcmp(argv[1], "batch") == 0)
+
+    if (strcmp(argv[1], "dbf2csv") == 0 )
     {
-        iRetCode = RunSqlCommand();
-        if (iRetCode != 0)
+        if (GeneraCommand(argv[2], GenerateCsv) != 0)
         {
-            printf("\nError while run sql, errorcode:%d", iRetCode);
+            printf("Error while generate csv file");
         }
     }
-    */
 
     if (strcmp(argv[1], "sqlldr") == 0)
     {
@@ -741,13 +784,13 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (strcmp(argv[1], "2dbf") == 0)
+    if (strcmp(argv[1], "csv2dbf") == 0)
     {
         // 兼容csv文件有的不用冒号括起来的
         iRetCode = Csv2DbfCommand(argv[2]);
         if (iRetCode != 0)
         {
-            printf("\n SqlLoader Error" );
+            printf("\n csv2dbf Error" );
         }
     }
 
@@ -755,5 +798,15 @@ int main(int argc, char *argv[])
 
     printf("Consume: %lds\n", (lEndStampTimes - lBeginStampTimes));
 
+    /* {{{{{{{{不用libcommondao.so}}}}}}}
+    if (strcmp(argv[1], "run") == 0 || strcmp(argv[1], "batch") == 0)
+    {
+        iRetCode = RunSqlCommand();
+        if (iRetCode != 0)
+        {
+            printf("\nError while run sql, errorcode:%d", iRetCode);
+        }
+    }
+    */
     return 0;
 }
