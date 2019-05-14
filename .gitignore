@@ -6,3 +6,4 @@
 *.o
 *.sqx
 /.vscode/ipch/*
+/.history/*
