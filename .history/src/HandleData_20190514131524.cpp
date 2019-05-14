@@ -42,7 +42,7 @@ char *g_pIncAndSplit = (char*) strIncAndSplit.c_str();
 typedef void (*pLineCallback)(int iCnt, const char *pcszContent);
 typedef void (*pCallback)(std::vector<stFieldHead> vecFieldHead, char *pcszContent);
 
-void trim(std::string &s, std::string surround = " ")
+void trim(std::string &s, std::string surround)
 {
     if (!s.empty())
     {
@@ -154,7 +154,7 @@ void GenerateSql(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
             {
                 memcpy(buffer, pcszContent, iColumnLen); // 按照字段长度拷贝内存
                 strTmp = string(buffer);
-                trim(strTmp);
+                trim(strTmp, " ");
             }
             else
             {
@@ -216,7 +216,7 @@ void GenerateCsv(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
             {
                 memcpy(buffer, pcszContent, iColumnLen); // 按照字段长度拷贝内存
                 strTmp = string(buffer);
-                trim(strTmp);
+                trim(strTmp, " ");
             }
             else
             {
@@ -736,8 +736,9 @@ int Csv2DbfCommand(string strFilePath)
     int iColumns = vecDbfColumns.size();
     int i = 0;
     char* token;
-    std::string surr = strIncAndSplit.substr(0, 1);
-    const char *delim = strIncAndSplit.substr(1, 1).c_str();
+    // const char* delim = ",";
+    const char *delim = strIncAndSplit.substr(0, 1).c_str();
+    std::string surr = strIncAndSplit.substr(1, 1);
 
     string szstrTmp [iColumns];
 
@@ -748,18 +749,13 @@ int Csv2DbfCommand(string strFilePath)
     while(getline(csv, buff))
     {
         char *oristr = (char*)buff.c_str();
-        // char *oristr = strdup(buff.c_str()); // XXX coredump 两次free
+        // char *oristr = strdup(buff.c_str()); // 坑,coredump 两次free
 
         // 不能用strtok，不适合字段为空的情况: aaaaa,,bbbb
         // for (token = strtok(const_cast<char*>(buff.c_str()), delim); token != NULL; token = strtok(NULL, delim))
         for (token = strsep(&oristr, delim), i = 0; token != NULL, i < iColumns; token = strsep(&oristr, delim), i++)
         {
-            szstrTmp[i] = token;
-            if (surr != "0")
-            {
-                trim(szstrTmp[i], surr); // XXX  调用这个函数后delim值改变了
-                delim = strIncAndSplit.substr(1, 1).c_str(); // 暂时先这样
-            }
+            szstrTmp[i] = trim(token, surr);
         }
         // free(oristr);
         dbf.AppendRec(szstrTmp);
@@ -836,4 +832,3 @@ int main(int argc, char *argv[])
     */
     return 0;
 }
-

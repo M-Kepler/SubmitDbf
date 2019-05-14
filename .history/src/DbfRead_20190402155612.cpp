@@ -418,8 +418,7 @@ int CDbfRead::AppendRec(std::string *sValues)
     char chFileEndFlag = 0x1A;  // 文件结束标志
     // TODO 处理csv文件不够字段数的情况
 
-    // FIXME char[4] 转 int
-    // 刚开始先用atoi, 但是有问题, 后来改用memcpy, 长度又有问题, 不能把ch[1]拷贝到int, 长度不对，应该只拷贝1
+    // FIXME char[4] 转 int // 刚开始先用atoi, 但是有问题, 后来改用memcpy, 长度又有问题, 不能把ch[1]拷贝到int, 长度不对，应该只拷贝1
 
     // 计算插入记录的位置: 文件头定义 + 字段定义 + 记录长度 + 1标记
     memcpy(&iRecSize, m_stDbfHead.szRecSize, sizeof(m_stDbfHead.szRecSize));

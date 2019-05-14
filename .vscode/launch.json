@@ -9,13 +9,13 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "main.out",
-            "args": [ ],
+            "args": ["csv2dbf", "../file/tmp_data_check_rst"],
             "stopAtEntry": false,
-            "cwd": "/mnt/f/workspace/dbf_to_oracle/src",
+            "cwd": "/mnt/f/workspaces/dbf_to_oracle/src",
             "environment": [],
             "externalConsole": true,
             "sourceFileMap": {
-                // "/mnt/c/Users/M-Kepler/source/repos/parse_log/parse_log" :"${workspaceFolder}/parse_log"
+                "/mnt/f/workspaces/dbf_to_oracle/src":"F:/workspaces/dbf_to_oracle/src",
             },
             "windows": {
                 "MIMode": "gdb",

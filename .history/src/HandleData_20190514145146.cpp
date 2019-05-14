@@ -758,7 +758,7 @@ int Csv2DbfCommand(string strFilePath)
             if (surr != "0")
             {
                 trim(szstrTmp[i], surr); // XXX  调用这个函数后delim值改变了
-                delim = strIncAndSplit.substr(1, 1).c_str(); // 暂时先这样
+                // delim = strIncAndSplit.substr(1, 1).c_str(); // 暂时先这样
             }
         }
         // free(oristr);

@@ -42,12 +42,13 @@ char *g_pIncAndSplit = (char*) strIncAndSplit.c_str();
 typedef void (*pLineCallback)(int iCnt, const char *pcszContent);
 typedef void (*pCallback)(std::vector<stFieldHead> vecFieldHead, char *pcszContent);
 
-void trim(std::string &s, std::string surround = " ")
+
+void trim(std::string &s)
 {
     if (!s.empty())
     {
-        s.erase(0, s.find_first_not_of(surround));
-        s.erase(s.find_last_not_of(surround) + 1);
+        s.erase(0, s.find_first_not_of(" "));
+        s.erase(s.find_last_not_of(" ") + 1);
     }
 }
 
@@ -223,27 +224,26 @@ void GenerateCsv(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
                 strTmp  = "";
             }
 
-            // 包括起字段的左边字符 "a
+/*
             if(chInclude != '0')
             {
-                // strncat(szSql, "\"", 1);
                 strncat(szSql, &chInclude, 1);
+                // strncat(szSql, "\"", 1);
             }
-
+            */
             snprintf(szTempBuff, sizeof(szTempBuff), "%s", strTmp.c_str());
             strncat(szSql, szTempBuff, sizeof(szSql) - strlen(szSql) - 1);
-
-            // 处理中间字段和最后一个字段的字段间分隔符
             if (i < vecFieldHead.size() - 1)
             {
                 // strncat(szSql, "\",", 2);
+                // strncat(szSql, g_pIncAndSplit, 2);
                 if (chInclude != '0')
                 {
                     strncat(szSql, g_pIncAndSplit, 2);
                 }
                 else
                 {
-                    strncat(szSql, &chSplit, 1);
+                    strncat(szSql, g_pIncAndSplit[1], 1);
                 }
             }
             else
@@ -659,12 +659,6 @@ int Csv2DbfCommand(string strFilePath)
         abort();
     }
 
-    if (GetConfigValue(strIncAndSplit, "IncAndSplit") != RET_OK)
-    {
-        printf("Get Config Failed!\n");
-        abort();
-    }
-
     // 解析配置中的字段属性组装成 stFieldHead 结构体
     for (auto x : vecDbfColumns)
     {
@@ -736,9 +730,7 @@ int Csv2DbfCommand(string strFilePath)
     int iColumns = vecDbfColumns.size();
     int i = 0;
     char* token;
-    std::string surr = strIncAndSplit.substr(0, 1);
-    const char *delim = strIncAndSplit.substr(1, 1).c_str();
-
+    const char* delim = ",";
     string szstrTmp [iColumns];
 
     csv.open(strFilePath.c_str(), ios::binary | ios::in);
@@ -748,18 +740,13 @@ int Csv2DbfCommand(string strFilePath)
     while(getline(csv, buff))
     {
         char *oristr = (char*)buff.c_str();
-        // char *oristr = strdup(buff.c_str()); // XXX coredump 两次free
+        // char *oristr = strdup(buff.c_str()); // 坑
 
         // 不能用strtok，不适合字段为空的情况: aaaaa,,bbbb
         // for (token = strtok(const_cast<char*>(buff.c_str()), delim); token != NULL; token = strtok(NULL, delim))
         for (token = strsep(&oristr, delim), i = 0; token != NULL, i < iColumns; token = strsep(&oristr, delim), i++)
         {
             szstrTmp[i] = token;
-            if (surr != "0")
-            {
-                trim(szstrTmp[i], surr); // XXX  调用这个函数后delim值改变了
-                delim = strIncAndSplit.substr(1, 1).c_str(); // 暂时先这样
-            }
         }
         // free(oristr);
         dbf.AppendRec(szstrTmp);
@@ -836,4 +823,3 @@ int main(int argc, char *argv[])
     */
     return 0;
 }
-
