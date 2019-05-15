@@ -51,7 +51,7 @@ void trim(std::string &s, std::string surround = " ")
     }
 }
 
-int GetConfigValue(string &strValue, string strKey, string strSection="CONFIG")
+int GetConfigValue(string &strValue, string strKey, string strSection = "CONFIG")
 {
     int iRetCode;
     iRetCode = ini.getValue(strSection, strKey, strValue);
@@ -266,7 +266,7 @@ void GenerateCsv(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
  * @param	: TableName     导入目标表
  * @param	: FileName      需要导入的文件
  * @param	: strTok        文件字段间分隔符
- * @param	: strScope      字段值的包含, 比如用双引号括住
+ * @param	: strScope      字段包围符, 比如用双引号括住
  * @return	:
  */
 int ImportDB(vector<stFieldHead> vecFieldHead, string TableName, string FileName, string strTok=",", string strSplit="\"")
@@ -280,7 +280,7 @@ int ImportDB(vector<stFieldHead> vecFieldHead, string TableName, string FileName
 
     if ((fctl = fopen(sqlload.c_str(), "w")) == NULL)
     {
-        return -1 ;
+        return EXIT_FAILURE;
     }
     fprintf(fctl, "LOAD DATA\n");
     fprintf(fctl, "INFILE '%s'\n", FileName.c_str());           // 文件名
@@ -306,17 +306,25 @@ int ImportDB(vector<stFieldHead> vecFieldHead, string TableName, string FileName
     fprintf(fctl, "\n)\n");
     fclose(fctl);
 
-    // TODO User, Pwd, Db替换成相应的值
-    // 执行系统命令
-    /*
-    sprintf(Execommand, "sqlldr userid=%s/%s@%s control=%s", User, Pwd, DB, sqlload.c_str());
+    string strUserName, strPwd, strDb;
+    if ((GetConfigValue(strUserName, "Db_UserName") != RET_OK)
+        || (GetConfigValue(strPwd, "Db_Pwd") != RET_OK)
+        || (GetConfigValue(strDb, "Db_Name") != RET_OK)
+    )
+    {
+        printf("Get db Config Failed!\n");
+        return EXIT_FAILURE;
+    }
+
+    // 利用sqlldr提交数据
+    sprintf(execommand, "sqlldr userid=%s/%s@%s control=%s", strUserName.c_str(), strPwd.c_str(), strDb.c_str(), sqlload.c_str());
     if (system(execommand) == -1)
     {
-        // SQL*Loader执行错误
-        return -1;
+        perror("sqlldr");
+        return EXIT_FAILURE;
     }
-    */
-    return 0 ;
+
+    return EXIT_SUCCESS;
 }
 
 
@@ -414,6 +422,7 @@ void DeleteAllFile(const char* dirPath, const char *extenStr="sql")
 }
 
 
+
 /*
  * @brief	: 获取文件夹下所有extenStr后缀的文件名列表
  * @param	:
@@ -475,27 +484,94 @@ string GetMsgValue(string strOrig, string strKey, string strSplit = ",")
 }
 
 
+/*
+ * @function: 获取配置中的dbf文件头配置
+ * @brief	: 
+ * @param	: 
+ * @return	: 
+ */
+int GetDbfHeadCnf(std::vector<stFieldHead>&  vecFieldHead, vector<string>& vecDbfColumns)
+{
+
+    int iRetCode;
+    int iTmp;
+    int iOffset = 1;
+    string strTmp;
+    stFieldHead stFieldTmp;
+    iRetCode = ini.load("./config.ini");
+
+    iRetCode = ini.getValues("DBF", "FIELD", vecDbfColumns);
+    if(iRetCode != 0)
+    {
+        printf("Get Config \"FIELD\" Failed!\n");
+        return iRetCode;
+    }
+
+    // 解析配置中的字段属性组装成 stFieldHead 结构体
+    for (auto x : vecDbfColumns)
+    {
+        memset(&stFieldTmp, 0, sizeof(struct stFieldHead));
+        if (x.find("NAME:") != string::npos)
+        {
+            strTmp = GetMsgValue(x, "NAME", ",");
+            memcpy(stFieldTmp.szName, strTmp.c_str(), strTmp.length());
+        }
+        if (x.find("TYPE:") != string::npos)
+        {
+            strTmp = GetMsgValue(x, "TYPE", ",");
+            memcpy(stFieldTmp.szType, strTmp.c_str(), strTmp.length());
+        }
+        if (x.find("OFFSET:") != string::npos)
+        {
+            strTmp = GetMsgValue(x, "OFFSET", ",");
+            memcpy(stFieldTmp.szOffset, &strTmp, sizeof(stFieldTmp.szOffset));
+        }
+        if (x.find("LEN:") != string::npos)
+        {
+            iTmp = atoi(GetMsgValue(x, "LEN", ",").c_str());
+            memcpy(stFieldTmp.szLen, &iTmp, sizeof(stFieldTmp.szLen));
+            memcpy(stFieldTmp.szOffset, &iOffset, sizeof(stFieldTmp.szOffset));
+            iOffset += iTmp;
+        }
+        if (x.find("PRECISION:") != string::npos)
+        {
+            iTmp = atoi(GetMsgValue(x, "PRECISION", ",").c_str());
+            memcpy(stFieldTmp.szPrecision, &iTmp, strTmp.length());
+        }
+        if (x.find("RESV2:") != string::npos)
+        {
+            strTmp =  GetMsgValue(x, "RESV2",",");
+            memcpy(stFieldTmp.szResv2, strTmp.c_str(), strTmp.length());
+        }
+        if (x.find("ID:") != string::npos)
+        {
+            strTmp =  GetMsgValue(x, "ID",",");
+            memcpy(stFieldTmp.szId, strTmp.c_str(), strTmp.length());
+        }
+        if (x.find("RESV3:") != string::npos)
+        {
+            strTmp =  GetMsgValue(x, "RESV3",",");
+            memcpy(stFieldTmp.szResv3, strTmp.c_str(), strTmp.length());
+        }
+        vecFieldHead.push_back(stFieldTmp);
+    }
+    return 0;
+}
+
+
+
 // main函数命令 gene
 int GeneraCommand(string strFilePath, pCallback handleFunc)
 {
     int iRetCode;
-    if ((GetConfigValue(strSqlFileFolder, "SqlFileFolder") != RET_OK)
-        || (GetConfigValue(strSqlFileCnt, "SqlFileCnt") != RET_OK)
-        || (GetConfigValue(strTableName, "TableName") != RET_OK)
-        || (GetConfigValue(strColumns, "Columns") != RET_OK)
-        || (GetConfigValue(strIncAndSplit, "IncAndSplit") != RET_OK)
-    )
-    {
-        printf("Get Config Failed!\n");
-        abort();
-    }
+
     DeleteAllFile(strSqlFileFolder.c_str());
 
     pf = fopen(GetFileName(), "w+");
 
     if (!pf)
     {
-        return -1;
+        return EXIT_FAILURE;
     }
     assert(pf);
 
@@ -546,7 +622,7 @@ int RunSqlCommand()
 
     if (!fpInsert)
     {
-        return -1;
+        return EXIT_FAILURE;
     }
 
     GetAllFile(strSqlFileFolder.c_str(), vecFileList);
@@ -634,84 +710,40 @@ int RunSqlCommand()
 // 需要先修改代码，生成sqlldr的data文件
 int SqlLoadCommand(string strFileName)
 {
-    if (ImportDB(vecColumns, strTableName, strFileName) < 0)
+    int iRetCode;
+    vector<string> vecDbfColumns;
+    std::vector<stFieldHead> vecFieldHead;
+    if (GetDbfHeadCnf(vecFieldHead, vecDbfColumns)!= 0)
+    {
+        perror("get dbf config error!\n");
+        return EXIT_FAILURE;
+    }
+
+    iRetCode = ImportDB(vecFieldHead, strTableName, strFileName, strIncAndSplit.substr(1, 1), strIncAndSplit.substr(0, 1));
+    if (iRetCode != 0)
     {
         printf("Load File Faile");
         abort();
     }
+    return EXIT_SUCCESS;
 }
 
 // main函数命令 2dbf
 int Csv2DbfCommand(string strFilePath)
 {
     int iRetCode;
-    int iTmp;
-    int iOffset = 1;
-    string strTmp;
-    stFieldHead stFieldTmp;
     vector<string> vecDbfColumns;
     std::vector<stFieldHead> vecFieldHead;
-
-    iRetCode = ini.getValues("DBF", "FIELD", vecDbfColumns);
-    if(iRetCode != 0)
+    if (GetDbfHeadCnf(vecFieldHead, vecDbfColumns)!= 0)
     {
-        printf("Get Config \"FIELD\" Failed!\n");
-        abort();
+        perror("get dbf config error!\n");
+        return EXIT_FAILURE;
     }
 
     if (GetConfigValue(strIncAndSplit, "IncAndSplit") != RET_OK)
     {
-        printf("Get Config Failed!\n");
+        perror("Get Config Failed!\n");
         abort();
-    }
-
-    // 解析配置中的字段属性组装成 stFieldHead 结构体
-    for (auto x : vecDbfColumns)
-    {
-        memset(&stFieldTmp, 0, sizeof(struct stFieldHead));
-        if (x.find("NAME:") != string::npos)
-        {
-            strTmp = GetMsgValue(x, "NAME", ",");
-            memcpy(stFieldTmp.szName, strTmp.c_str(), strTmp.length());
-        }
-        if (x.find("TYPE:") != string::npos)
-        {
-            strTmp = GetMsgValue(x, "TYPE", ",");
-            memcpy(stFieldTmp.szType, strTmp.c_str(), strTmp.length());
-        }
-        if (x.find("OFFSET:") != string::npos)
-        {
-            strTmp = GetMsgValue(x, "OFFSET", ",");
-            memcpy(stFieldTmp.szOffset, &strTmp, sizeof(stFieldTmp.szOffset));
-        }
-        if (x.find("LEN:") != string::npos)
-        {
-            iTmp = atoi(GetMsgValue(x, "LEN", ",").c_str());
-            memcpy(stFieldTmp.szLen, &iTmp, sizeof(stFieldTmp.szLen));
-            memcpy(stFieldTmp.szOffset, &iOffset, sizeof(stFieldTmp.szOffset));
-            iOffset += iTmp;
-        }
-        if (x.find("PRECISION:") != string::npos)
-        {
-            iTmp = atoi(GetMsgValue(x, "PRECISION", ",").c_str());
-            memcpy(stFieldTmp.szPrecision, &iTmp, strTmp.length());
-        }
-        if (x.find("RESV2:") != string::npos)
-        {
-            strTmp =  GetMsgValue(x, "RESV2",",");
-            memcpy(stFieldTmp.szResv2, strTmp.c_str(), strTmp.length());
-        }
-        if (x.find("ID:") != string::npos)
-        {
-            strTmp =  GetMsgValue(x, "ID",",");
-            memcpy(stFieldTmp.szId, strTmp.c_str(), strTmp.length());
-        }
-        if (x.find("RESV3:") != string::npos)
-        {
-            strTmp =  GetMsgValue(x, "RESV3",",");
-            memcpy(stFieldTmp.szResv3, strTmp.c_str(), strTmp.length());
-        }
-        vecFieldHead.push_back(stFieldTmp);
     }
 
     CDbfRead dbf;
@@ -780,8 +812,19 @@ int main(int argc, char *argv[])
         printf("conver dbf to file:\t[exec] gene [path/to/dbf]\n");
         printf("commit use sqlldr:\t[exec] sqlldr [path/to/datafile(gene first)]\n");
         printf("conver csv to dbf:\t[exec] 2dbf [path/to/csv]\n");
-        return -1;
+        return EXIT_FAILURE;
     }
+    if ((GetConfigValue(strSqlFileFolder, "SqlFileFolder") != RET_OK)
+        || (GetConfigValue(strSqlFileCnt, "SqlFileCnt") != RET_OK)
+        || (GetConfigValue(strTableName, "TableName") != RET_OK)
+        || (GetConfigValue(strColumns, "Columns") != RET_OK)
+        || (GetConfigValue(strIncAndSplit, "IncAndSplit") != RET_OK)
+    )
+    {
+        printf("Get Config Failed!\n");
+        return EXIT_FAILURE;
+    }
+
 
     lBeginStampTimes = time(NULL);
 
@@ -816,7 +859,8 @@ int main(int argc, char *argv[])
         iRetCode = Csv2DbfCommand(argv[2]);
         if (iRetCode != 0)
         {
-            printf("\n csv2dbf Error" );
+            perror("\n csv2dbf Error" );
+            return EXIT_FAILURE;
         }
     }
 
