@@ -83,11 +83,9 @@ const char *GetFileName( )
     }
 
     memset(szFileName, 0, sizeof(szFileName));
-    // snprintf(szFileName, sizeof(szFileName), "/sql_%4.4d", fileNo);
+    snprintf(szFileName, sizeof(szFileName), "_%4.4d", fileNo);
 
-    // g_strFile = strValue + szFileName + ".sql";
-    g_strFile = strValue + "/" + strTableName;
-    // return szFileName;
+    g_strFile = strValue + "/" + strTableName + szFileName;
     return g_strFile.c_str();
 }
 
@@ -202,6 +200,17 @@ void GenerateCsv(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
 
     string strTmp;
 
+    // 每n条数据输出到一个文件
+    if (g_count >= atoi(strSqlFileCnt.c_str()) )
+    {
+        g_count = 0;
+        fclose(pf);
+        fileNo++;
+        pf = fopen(GetFileName(), "w+");
+        assert(pf);
+    }
+    g_count++;
+
     for (int i = 0; i < vecFieldHead.size(); i++)
     {
         if (vecFieldHead[i].szName[0] != 0x00 && vecFieldHead[i].szName[0] != '\r')
@@ -258,73 +267,6 @@ void GenerateCsv(std::vector<stFieldHead> vecFieldHead, char *pcszContent)
     fwrite(szSql, strlen(szSql), 1, pf);
     fwrite("\n", strlen("\n"), 1, pf);
     vecColumns = vecFieldHead;
-}
-
-/*
- * @brief	: 利用 sqlldr 导入文本到 oracle
- * @param   : vecFieldHead  字段vector
- * @param	: TableName     导入目标表
- * @param	: FileName      需要导入的文件
- * @param	: strTok        文件字段间分隔符
- * @param	: strScope      字段包围符, 比如用双引号括住
- * @return	:
- */
-int ImportDB(vector<stFieldHead> vecFieldHead, string TableName, string FileName, string strTok=",", string strSplit="\"")
-{
-    // 产生SQL*Loader控制文件
-    FILE *fctl;
-    FILE *fp;
-    int iStart = 1;
-    char execommand[256];
-    string sqlload = "./sqlload.ctl";
-
-    if ((fctl = fopen(sqlload.c_str(), "w")) == NULL)
-    {
-        return EXIT_FAILURE;
-    }
-    fprintf(fctl, "LOAD DATA\n");
-    fprintf(fctl, "INFILE '%s'\n", FileName.c_str());           // 文件名
-    fprintf(fctl, "APPEND INTO TABLE %s\n", TableName.c_str()); // 表名
-    fprintf(fctl, "FIELDS TERMINATED BY \"%s\"\n", strTok.c_str());   // 数据分隔符
-    fprintf(fctl, "Optionally enclosed by '%s'\n", strSplit.c_str()); // 字段包围符
-    fprintf(fctl, "TRAILING NULLCOLS\n");
-    fprintf(fctl, "(\n");
-
-    for (int i = 0; i < vecFieldHead.size(); i++)
-    {
-        if (vecFieldHead[i].szName[0] != 0x00 && vecFieldHead[i].szName[0] != '\r')
-        {
-            // fprintf(fctl, "%11s POSITION(%d:%d)", vecFieldHead[i].szName, iStart, *(int *)vecFieldHead[i] + iStart - 1);
-            // iStart += *(int *)vecFieldHead[i];
-            fprintf(fctl, "%11s", vecFieldHead[i].szName);
-            if (i < vecFieldHead.size() - 1)
-            {
-                fprintf(fctl, ",\n");
-            }
-        }
-    }
-    fprintf(fctl, "\n)\n");
-    fclose(fctl);
-
-    string strUserName, strPwd, strDb;
-    if ((GetConfigValue(strUserName, "Db_UserName") != RET_OK)
-        || (GetConfigValue(strPwd, "Db_Pwd") != RET_OK)
-        || (GetConfigValue(strDb, "Db_Name") != RET_OK)
-    )
-    {
-        printf("Get db Config Failed!\n");
-        return EXIT_FAILURE;
-    }
-
-    // 利用sqlldr提交数据
-    sprintf(execommand, "sqlldr userid=%s/%s@%s control=%s", strUserName.c_str(), strPwd.c_str(), strDb.c_str(), sqlload.c_str());
-    if (system(execommand) == -1)
-    {
-        perror("sqlldr");
-        return EXIT_FAILURE;
-    }
-
-    return EXIT_SUCCESS;
 }
 
 
@@ -414,13 +356,38 @@ void DeleteAllFile(const char* dirPath, const char *extenStr="sql")
     {
         if(strstr(pDirent->d_name, extenStr))
         {
-            string FilePath= dirPath + strSplit + string(pDirent->d_name);
+            string FilePath = dirPath + strSplit + string(pDirent->d_name);
             remove(FilePath.c_str());
         }
     }
     closedir(dir);
 }
 
+
+/*
+ * @function: 批量给文件加后缀
+ * @brief	: 
+ * @param	: 
+ * @return	: 
+ */
+int RenameAllFile(const char *dirPath, const char *postfix)
+{
+    DIR *dir  =  opendir(dirPath);
+    dirent *pDirent = NULL;
+    string strSplit  =  "/";
+    char filenewname[260 + 1] = {0};
+    while((pDirent = readdir(dir)) != NULL)
+    {
+        string fileoldname = dirPath + strSplit + pDirent->d_name;
+        snprintf(filenewname, sizeof(filenewname), "%s.%s", fileoldname.c_str(), postfix);
+        if (strchr(strrchr(fileoldname.c_str(), '/') + 1, '.') == NULL)
+        {
+            rename(fileoldname.c_str(), filenewname);
+        }
+    }
+    closedir(dir);
+    return EXIT_SUCCESS;
+}
 
 
 /*
@@ -559,13 +526,93 @@ int GetDbfHeadCnf(std::vector<stFieldHead>&  vecFieldHead, vector<string>& vecDb
 }
 
 
+/*
+ * @brief	: 利用 sqlldr 导入文本到 oracle
+ * @param   : vecFieldHead  字段vector
+ * @param	: strTableName     导入目标表
+ * @param	: strFilePath      需要导入的文件
+ * @param	: strTok        文件字段间分隔符
+ * @param	: strScope      字段包围符, 比如用双引号括住
+ * @return	:
+ */
+int ImportDB(vector<stFieldHead> vecFieldHead, string strTableName, string strFilePath, string strTok=",", string strSplit="\"")
+{
+    // 产生SQL*Loader控制文件
+    FILE *fctl;
+    FILE *fp;
+    int iStart = 1;
+    char execommand[256];
+    vector<string> vecFileList;
+    string sqlload = "./sqlload.ctl";
 
-// main函数命令 gene
-int GeneraCommand(string strFilePath, pCallback handleFunc)
+    if ((fctl = fopen(sqlload.c_str(), "w")) == NULL)
+    {
+        return EXIT_FAILURE;
+    }
+    fprintf(fctl, "LOAD DATA\n");
+
+    GetAllFile(strFilePath.c_str(), vecFileList, "csv");
+    for (size_t i = 0; i < vecFileList.size(); i++)
+    {
+        fprintf(fctl, "INFILE '%s'\n", vecFileList[i].c_str()); // 文件名
+    }
+
+    fprintf(fctl, "APPEND INTO TABLE %s\n", strTableName.c_str()); // 表名
+    fprintf(fctl, "FIELDS TERMINATED BY \"%s\"\n", strTok.c_str());   // 数据分隔符
+    fprintf(fctl, "Optionally enclosed by '%s'\n", strSplit.c_str()); // 字段包围符
+    fprintf(fctl, "TRAILING NULLCOLS\n");
+    fprintf(fctl, "(\n");
+
+    for (int i = 0; i < vecFieldHead.size(); i++)
+    {
+        if (vecFieldHead[i].szName[0] != 0x00 && vecFieldHead[i].szName[0] != '\r')
+        {
+            // fprintf(fctl, "%11s POSITION(%d:%d)", vecFieldHead[i].szName, iStart, *(int *)vecFieldHead[i] + iStart - 1);
+            // iStart += *(int *)vecFieldHead[i];
+            fprintf(fctl, "%11s", vecFieldHead[i].szName);
+            if (i < vecFieldHead.size() - 1)
+            {
+                fprintf(fctl, ",\n");
+            }
+        }
+    }
+    fprintf(fctl, "\n)\n");
+    fclose(fctl);
+
+    string strUserName, strPwd, strDb;
+    if ((GetConfigValue(strUserName, "Db_UserName") != RET_OK)
+        || (GetConfigValue(strPwd, "Db_Pwd") != RET_OK)
+        || (GetConfigValue(strDb, "Db_Name") != RET_OK)
+    )
+    {
+        printf("Get db Config Failed!\n");
+        return EXIT_FAILURE;
+    }
+
+    // 利用sqlldr提交数据
+    sprintf(execommand, "sqlldr userid=%s/%s@%s control=%s", strUserName.c_str(), strPwd.c_str(), strDb.c_str(), sqlload.c_str());
+    if (system(execommand) == -1)
+    {
+        perror("sqlldr");
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+
+
+/*
+ * @function: main函数命令 dbf2sql dbf2csv, 会根据命令把后缀为sql或csv的文件先删除
+ * @brief	: 
+ * @param	: 
+ * @return	: 
+ */
+int GeneraCommand(string strFilePath, pCallback handleFunc, string extenStr)
 {
     int iRetCode;
 
-    DeleteAllFile(strSqlFileFolder.c_str());
+    DeleteAllFile(strSqlFileFolder.c_str(), extenStr.c_str());
 
     pf = fopen(GetFileName(), "w+");
 
@@ -707,7 +754,12 @@ int RunSqlCommand()
 
 
 // main函数命令 sqlldr
-// 需要先修改代码，生成sqlldr的data文件
+/*
+ * @function: 把文件 strFileName 作为sqlldr控制文件中的DATA，导入数据库
+ * @brief	: 
+ * @param	: 
+ * @return	: 
+ */
 int SqlLoadCommand(string strFileName)
 {
     int iRetCode;
@@ -830,18 +882,21 @@ int main(int argc, char *argv[])
 
     if (strcmp(argv[1], "dbf2sql") == 0 )
     {
-        if (GeneraCommand(argv[2], GenerateSql) != 0)
+        if (GeneraCommand(argv[2], GenerateSql, "sql") != 0)
         {
             printf("Error while generate sql file");
+            return EXIT_FAILURE;
         }
+        RenameAllFile(strSqlFileFolder.c_str(), "sql");
     }
 
     if (strcmp(argv[1], "dbf2csv") == 0 )
     {
-        if (GeneraCommand(argv[2], GenerateCsv) != 0)
+        if (GeneraCommand(argv[2], GenerateCsv, "csv") != 0)
         {
             printf("Error while generate csv file");
         }
+        RenameAllFile(strSqlFileFolder.c_str(), "csv");
     }
 
     if (strcmp(argv[1], "sqlldr") == 0)
