@@ -1,17 +1,18 @@
-#include "DbfRead.h"
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <time.h>
-#include <vector>
-#include <string>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <fcntl.h>
-#include <sys/mman.h>
-
 #include <fstream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <string>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
+#include <vector>
+
+#include "DbfRead.h"
+
 using namespace std;
 
 CDbfRead::CDbfRead(const std::string &strFile)
@@ -36,9 +37,9 @@ CDbfRead::~CDbfRead(void)
 int CDbfRead::ReadHead()
 {
     char szHead[32] = {0};
-    int fieldLen;           // 数据记录长度
-    int filedCount;         // 数据记录数量
-    char *pField;           // 数据记录开始的位置
+    int fieldLen;   // 数据记录长度
+    int filedCount; // 数据记录数量
+    char *pField;   // 数据记录开始的位置
 
     if (m_strFile.empty())
     {
@@ -61,7 +62,7 @@ int CDbfRead::ReadHead()
     memcpy(&m_sFileHeadBytesNum, &szHead[8], 2); // dbf二进制文件中文件头字节数
     memcpy(&m_sRecordSize, &szHead[10], 2);      // 每行记录所占空间 + 末尾一位标识符
 
-    fieldLen = m_sFileHeadBytesNum - 32;         // 文件头去除前32个描述文件属性的字节后, 得到字段信息的长度
+    fieldLen = m_sFileHeadBytesNum - 32; // 文件头去除前32个描述文件属性的字节后, 得到字段信息的长度
     pField = (char *)malloc(fieldLen);
 
     if (!pField)
@@ -102,21 +103,20 @@ int CDbfRead::ReadHead()
     return 0;
 }
 
-
 int CDbfRead::Read(pCallback pfn, int nPageNum)
 {
     int fd;
-    int mmapCount = 0;              // 根据文件大小定映射次数, ??? 为什么不一次映射完
-    char *pPos = NULL;              // 读取位置记录
+    int mmapCount = 0; // 根据文件大小定映射次数, ??? 为什么不一次映射完
+    char *pPos = NULL; // 读取位置记录
     struct stat stat;
-    size_t mmapSize;                // 一次映射的长度大小, 必须是页的整数倍;不满一页也要分配一页空间
-                                    // 虽然多出来的空间会清零,32位机器上1页是4k大小
-    size_t totalSize;               // 保存一次映射中未处理的数据记录的大小
-    size_t remainFileSize;          // dbf文件的未映射到内存区域的大小
-    int remainLen = 0;              // 一条记录被分在A,B页; (其实是分隔在1、2两次映射的文件,但每次映射都是页的整数倍, 所以说分隔在两页也对)保存被截断的记录在A页页尾的长度
-    int tailLen = 0;                // 一条记录被分在A,B页; 保存被截断的记录在B页页头的长度
-    char remainBuf[2048] = {0};     // 一条记录被分在A,B页; 保存被截断的那条记录在A页中的数据
-    char firstRecord[1024] = {0};   // 一条记录被分在A,B页; 保存被截断的那条记录
+    size_t mmapSize;              // 一次映射的长度大小, 必须是页的整数倍;不满一页也要分配一页空间
+                                  // 虽然多出来的空间会清零,32位机器上1页是4k大小
+    size_t totalSize;             // 保存一次映射中未处理的数据记录的大小
+    size_t remainFileSize;        // dbf文件的未映射到内存区域的大小
+    int remainLen = 0;            // 一条记录被分在A,B页; (其实是分隔在1、2两次映射的文件,但每次映射都是页的整数倍, 所以说分隔在两页也对)保存被截断的记录在A页页尾的长度
+    int tailLen = 0;              // 一条记录被分在A,B页; 保存被截断的记录在B页页头的长度
+    char remainBuf[2048] = {0};   // 一条记录被分在A,B页; 保存被截断的那条记录在A页中的数据
+    char firstRecord[1024] = {0}; // 一条记录被分在A,B页; 保存被截断的那条记录
 
     fd = open(m_strFile.c_str(), O_RDONLY, 0);
     if (fd < 0)
@@ -124,10 +124,12 @@ int CDbfRead::Read(pCallback pfn, int nPageNum)
         return -1;
     }
 
-    fstat(fd, &stat); // 文件fd结构到stat结构体
-
-    mmapSize = nPageNum * getpagesize(); // getpagesize()获取内存页大小, 这里一次映射500M
-    mmapCount = stat.st_size / mmapSize; // 已经知道文件大小了, 为什么不直接根据大小进行合理映射呢
+    // 文件fd结构到stat结构体
+    fstat(fd, &stat);
+    // getpagesize()获取内存页大小, 这里一次映射500M
+    mmapSize = nPageNum * getpagesize();
+    // 已经知道文件大小了, 为什么不直接根据大小进行合理映射呢
+    mmapCount = stat.st_size / mmapSize;
 
     // 映射到内存的大小和文件的大小
     if (0 != stat.st_size % mmapSize)
@@ -141,7 +143,6 @@ int CDbfRead::Read(pCallback pfn, int nPageNum)
     }
 
     remainFileSize = stat.st_size;
-
 
     for (int i = 0; i < mmapCount; i++)
     {
@@ -238,7 +239,6 @@ int CDbfRead::Read(pCallback pfn, int nPageNum)
     return 0;
 }
 
-
 int CDbfRead::ReadMmapOnce(pCallback pfn, int nPageNum)
 {
     int fd;
@@ -277,7 +277,7 @@ int CDbfRead::ReadMmapOnce(pCallback pfn, int nPageNum)
 
     totalSize = stat.st_size;
     pPos = (char *)pMmapBuf + m_sFileHeadBytesNum + 1;
-    totalSize = totalSize - m_sFileHeadBytesNum;        // 总大小减去文件头后就是数据记录的大小
+    totalSize = totalSize - m_sFileHeadBytesNum; // 总大小减去文件头后就是数据记录的大小
 
     int j = 0;
     while (totalSize >= m_sRecordSize)
@@ -325,8 +325,6 @@ int CDbfRead::ReadNoMmap(pCallback pfn)
     file.close();
     return 0;
 }
-
-
 
 int CDbfRead::AddHead(std::vector<stFieldHead> vecField)
 {
@@ -403,8 +401,6 @@ int CDbfRead::AddHead(std::vector<stFieldHead> vecField)
 
     m_stDbfHead = dbfHead;
 
-
-
     return 0;
 }
 
@@ -415,7 +411,7 @@ int CDbfRead::AppendRec(std::string *sValues)
     int iOffset;
     short iRecSize;
     uint8_t iLen;
-    char chFileEndFlag = 0x1A;  // 文件结束标志
+    char chFileEndFlag = 0x1A; // 文件结束标志
     // TODO 处理csv文件不够字段数的情况
 
     // FIXME char[4] 转 int
@@ -426,7 +422,7 @@ int CDbfRead::AppendRec(std::string *sValues)
     memcpy(&iRecCount, m_stDbfHead.szRecCount, sizeof(m_stDbfHead.szRecCount));
     int iRecPos = sizeof(stDbfHead) + m_vecFieldHead.size() * sizeof(stFieldHead) + iRecSize * iRecCount + 1;
     int iRes = fseek(m_newDbf, iRecPos, SEEK_SET);
-    if (iRes != 0 )
+    if (iRes != 0)
     {
         std::cerr << __FUNCTION__ << " Error seeking to new Record position " << std::endl;
         return 1;
@@ -443,22 +439,22 @@ int CDbfRead::AppendRec(std::string *sValues)
         char cType = m_vecFieldHead[f].szType[0];
         memcpy(&iLen, m_vecFieldHead[f].szLen, 1);
         memcpy(&iOffset, m_vecFieldHead[f].szOffset, sizeof(m_vecFieldHead[f].szOffset));
-        if( cType == 'I' )
+        if (cType == 'I')
         {
             auto iTmp = atoi(sFieldValue.c_str());
             memcpy(&m_pRecord[iOffset], &iTmp, sizeof(iTmp));
         }
-        else if( cType== 'B' )
+        else if (cType == 'B')
         {
             auto iTmp = atof(sFieldValue.c_str());
             memcpy(&m_pRecord[iOffset], &iTmp, sizeof(iTmp));
         }
-        else if( cType== 'L' )
+        else if (cType == 'L')
         {
             // logical
             if (sFieldValue == "T" || sFieldValue == "TRUE")
                 m_pRecord[iOffset] = 'T';
-            else if( sFieldValue=="?")
+            else if (sFieldValue == "?")
                 m_pRecord[iOffset] = '?';
             else
                 m_pRecord[iOffset] = 'F';
@@ -469,7 +465,7 @@ int CDbfRead::AppendRec(std::string *sValues)
             for (unsigned int j = 0; j < iLen; j++)
             {
                 int n = iOffset + j;
-                if( j < sFieldValue.length() )
+                if (j < sFieldValue.length())
                     m_pRecord[n] = sFieldValue[j];
                 else
                     m_pRecord[n] = 0;
@@ -480,7 +476,7 @@ int CDbfRead::AppendRec(std::string *sValues)
     // write the record at the end of the file
     // FIXME
     int nBytesWritten = fwrite(m_pRecord, 1, iRecSize, m_newDbf);
-    if( nBytesWritten != iRecSize)
+    if (nBytesWritten != iRecSize)
     {
         std::cerr << __FUNCTION__ << " Failed to write new record ! wrote " << nBytesWritten << " bytes but wanted to write " << iRecSize << " bytes" << std::endl;
         return 1;
@@ -511,4 +507,3 @@ int CDbfRead::AppendRec(std::string *sValues)
     }
     return 0;
 }
-
